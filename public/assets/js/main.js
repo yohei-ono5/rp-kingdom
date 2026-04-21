@@ -39,6 +39,7 @@ controls.maxPolarAngle = Math.PI * 0.48;
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
 const loader = new GLTFLoader();
+const houseModelUrl = new URL('../models/Fantasy_House_6.glb', import.meta.url).href;
 
 const villageGroup = new THREE.Group();
 const mapOverlayGroup = new THREE.Group();
@@ -399,7 +400,7 @@ function createMapMarker(wrapper) {
 }
 
 function loadHouse(data) {
-  loader.load('../models/Fantasy_House_6.glb', (gltf) => {
+  loader.load(houseModelUrl, (gltf) => {
     const model = gltf.scene;
 
     applyOpaqueMaterialFix(model);
