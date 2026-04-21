@@ -1,12 +1,16 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { HOUSE_DESTINATIONS } from './site-config.js';
 
 const VIEW_BLEND_SPEED = 0.08;
 const CAMERA_BLEND_SPEED = 0.07;
 const HOUSE_SCALE_BLEND_SPEED = 0.1;
 const DRAG_THRESHOLD = 6;
 const FOCUS_COMPLETE_DISTANCE = 0.32;
+const CAMERA_TRANSITION_DURATION = 1800;
+const MAP_PULLBACK_DISTANCE = 5.5;
+const MAP_PULLBACK_HEIGHT = 3.8;
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x1a1a2e);
@@ -46,6 +50,8 @@ const mapOverlayGroup = new THREE.Group();
 scene.add(villageGroup);
 scene.add(mapOverlayGroup);
 
+renderViewButtons();
+
 const desiredCameraPosition = camera.position.clone();
 const desiredTarget = controls.target.clone();
 
@@ -69,9 +75,13 @@ const houseMaterials = [];
 const mapMarkerMeta = [];
 
 const ui = {
+  resetView: document.getElementById('reset-view'),
   mapToggle: document.getElementById('map-toggle'),
   viewButtons: Array.from(document.querySelectorAll('.nav-btn[data-view]')),
-  hudNote: document.getElementById('hud-note')
+  hudNote: document.getElementById('hud-note'),
+  houseTooltip: document.getElementById('house-tooltip'),
+  houseTooltipLabel: document.querySelector('.house-tooltip-label'),
+  houseTooltipName: document.querySelector('.house-tooltip-name')
 };
 
 let ground = null;
@@ -93,6 +103,17 @@ let focusRequest = null;
 
 const viewTransition = {
   progress: 0
+};
+
+const cameraTransition = {
+  active: false,
+  startedAt: 0,
+  mode: 'direct',
+  fromPosition: camera.position.clone(),
+  fromTarget: controls.target.clone(),
+  toPosition: camera.position.clone(),
+  toTarget: controls.target.clone(),
+  path: null
 };
 
 const cameraState = {
@@ -264,69 +285,27 @@ function initGround() {
 }
 
 function initMapOverlay() {
-  const gridPositions = [];
-  const radius = 13;
-  const step = 0.9;
-
-  for (let x = -radius; x <= radius; x += step) {
-    for (let z = -radius; z <= radius; z += step) {
-      if (Math.hypot(x, z) <= radius) {
-        gridPositions.push(x, 0.08, z);
-      }
-    }
-  }
-
-  const dotsGeometry = new THREE.BufferGeometry();
-  dotsGeometry.setAttribute(
-    'position',
-    new THREE.Float32BufferAttribute(gridPositions, 3)
-  );
-
-  const dotsMaterial = new THREE.PointsMaterial({
-    color: 0x9ce6ff,
-    size: 0.11,
-    transparent: true,
-    opacity: 0,
-    depthWrite: false,
-    sizeAttenuation: true
-  });
-
-  overlayMaterials.push(dotsMaterial);
-
-  const dots = new THREE.Points(dotsGeometry, dotsMaterial);
-  mapOverlayGroup.add(dots);
-
-  const rings = [];
-  for (let i = 0; i < 3; i += 1) {
-    const ringMaterial = new THREE.MeshBasicMaterial({
-      color: 0x8dd8ff,
-      transparent: true,
-      opacity: 0,
-      side: THREE.DoubleSide
-    });
-    overlayMaterials.push(ringMaterial);
-
-    const ring = new THREE.Mesh(
-      new THREE.RingGeometry(3.8 + i * 2.3, 3.95 + i * 2.3, 96),
-      ringMaterial
-    );
-    ring.rotation.x = -Math.PI / 2;
-    ring.position.y = 0.04 + i * 0.015;
-    mapOverlayGroup.add(ring);
-    rings.push(ring);
-  }
-
-  mapOverlayGroup.userData.rings = rings;
+  mapOverlayGroup.userData.rings = [];
 }
 
 function loadVillage() {
-  const houses = [
-    { id: 'home', name: 'Home House', url: '#home', position: [0, 0, 0], scale: 0.72, rotationY: 0.08 },
-    { id: 'gallery', name: 'Gallery House', url: '#gallery', position: [-4, 0, 3], scale: 0.68, rotationY: -0.28 },
-    { id: 'shop', name: 'Shop House', url: '#shop', position: [4, 0, -3], scale: 0.7, rotationY: 0.35 }
-  ];
+  HOUSE_DESTINATIONS.forEach(loadHouse);
+}
 
-  houses.forEach(loadHouse);
+function renderViewButtons() {
+  const viewNav = document.getElementById('view-nav');
+  if (!viewNav) return;
+
+  viewNav.replaceChildren(
+    ...HOUSE_DESTINATIONS.map((item) => {
+      const button = document.createElement('button');
+      button.className = 'nav-btn';
+      button.type = 'button';
+      button.dataset.view = item.id;
+      button.textContent = item.label;
+      return button;
+    })
+  );
 }
 
 function applyOpaqueMaterialFix(root) {
@@ -409,6 +388,7 @@ function loadHouse(data) {
     const wrapper = new THREE.Group();
     wrapper.userData = {
       id: data.id,
+      label: data.label,
       name: data.name,
       url: data.url,
       isHouse: true,
@@ -438,9 +418,14 @@ function addEvents() {
   renderer.domElement.addEventListener('pointermove', onPointerMove);
   renderer.domElement.addEventListener('pointerup', onPointerUp);
   renderer.domElement.addEventListener('pointerleave', onPointerLeave);
+  controls.addEventListener('change', onControlsChange);
 
   ui.mapToggle?.addEventListener('click', () => {
     setView(currentView === 'map' ? 'village' : 'map', { preserveFocus: false });
+  });
+
+  ui.resetView?.addEventListener('click', () => {
+    resetToVillageView();
   });
 
   ui.viewButtons.forEach((button) => {
@@ -458,6 +443,15 @@ function onResize() {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+function onControlsChange() {
+  if (cameraTransition.active || currentView === 'map') {
+    return;
+  }
+
+  desiredCameraPosition.copy(camera.position);
+  desiredTarget.copy(controls.target);
 }
 
 function onPointerDown(event) {
@@ -478,17 +472,25 @@ function onPointerMove(event) {
   }
 
   if (popup.style.display === 'block') {
+    hideHouseTooltip();
     document.body.style.cursor = 'default';
     return;
   }
 
   const hoveredHouse = getHoveredHouse(event);
-  document.body.style.cursor = hoveredHouse ? 'pointer' : 'default';
+  const showHoverState = hoveredHouse && currentView === 'village';
+  document.body.style.cursor = showHoverState ? 'pointer' : 'default';
 
   villageGroup.children.forEach((house) => {
     const isHovered = hoveredHouse === house && currentView === 'village';
     house.userData.targetHoverScale = isHovered ? 1.04 : 1;
   });
+
+  if (showHoverState) {
+    showHouseTooltip(hoveredHouse, event);
+  } else {
+    hideHouseTooltip();
+  }
 }
 
 function onPointerUp(event) {
@@ -509,10 +511,27 @@ function onPointerLeave() {
   pointerDown = false;
   dragMoved = false;
   document.body.style.cursor = 'default';
+  hideHouseTooltip();
 
   villageGroup.children.forEach((house) => {
     house.userData.targetHoverScale = 1;
   });
+}
+
+function showHouseTooltip(house, event) {
+  if (!ui.houseTooltip || !ui.houseTooltipLabel || !ui.houseTooltipName) {
+    return;
+  }
+
+  ui.houseTooltipLabel.textContent = house.userData.label || house.userData.id?.toUpperCase() || 'HOUSE';
+  ui.houseTooltipName.textContent = house.userData.name || '';
+  ui.houseTooltip.style.left = `${event.clientX + 16}px`;
+  ui.houseTooltip.style.top = `${event.clientY + 18}px`;
+  ui.houseTooltip.classList.add('is-visible');
+}
+
+function hideHouseTooltip() {
+  ui.houseTooltip?.classList.remove('is-visible');
 }
 
 function updateMouseFromEvent(event) {
@@ -537,6 +556,8 @@ function getHoveredHouse(event) {
 }
 
 function setView(view, options = {}) {
+  const previousView = currentView;
+  const transitionMode = resolveCameraTransitionMode(previousView, view);
   currentView = view;
 
   if (!options.preserveFocus) {
@@ -549,15 +570,17 @@ function setView(view, options = {}) {
     closeLinkPopup();
   }
 
-  applyViewState(options);
+  applyViewState({ ...options, transitionMode });
+  startCameraTransition(transitionMode);
 }
 
 function applyViewState(options = {}) {
   if (currentView === 'map') {
     desiredCameraPosition.copy(cameraState.map.position);
     desiredTarget.copy(cameraState.map.target);
-    controls.enableRotate = false;
-    controls.maxPolarAngle = 0.02;
+    const deferMapLock = options.transitionMode === 'map-enter';
+    controls.enableRotate = deferMapLock;
+    controls.maxPolarAngle = deferMapLock ? Math.PI * 0.48 : 0.02;
     controls.minPolarAngle = 0;
     controls.minDistance = 10;
     controls.maxDistance = 24;
@@ -589,6 +612,114 @@ function applyFocusCamera(house) {
   desiredTarget.copy(worldPosition).add(new THREE.Vector3(0, 1.1, 0));
 }
 
+function resolveCameraTransitionMode(previousView, nextView) {
+  if (previousView !== 'map' && nextView === 'map') {
+    return 'map-enter';
+  }
+
+  return 'direct';
+}
+
+function startCameraTransition(mode) {
+  cameraTransition.mode = mode;
+  cameraTransition.startedAt = performance.now();
+  cameraTransition.fromPosition.copy(camera.position);
+  cameraTransition.fromTarget.copy(controls.target);
+  cameraTransition.toPosition.copy(desiredCameraPosition);
+  cameraTransition.toTarget.copy(desiredTarget);
+  cameraTransition.path = mode === 'map-enter'
+    ? createMapEnterTransitionPath()
+    : null;
+  cameraTransition.active =
+    cameraTransition.fromPosition.distanceTo(cameraTransition.toPosition) > 0.01
+    || cameraTransition.fromTarget.distanceTo(cameraTransition.toTarget) > 0.01;
+}
+
+function smootherStep(value) {
+  return value * value * value * (value * (value * 6 - 15) + 10);
+}
+
+function createMapEnterTransitionPath() {
+  const fromPosition = cameraTransition.fromPosition.clone();
+  const fromTarget = cameraTransition.fromTarget.clone();
+  const toPosition = cameraTransition.toPosition.clone();
+  const toTarget = cameraTransition.toTarget.clone();
+
+  const viewDirection = fromPosition.clone().sub(fromTarget).normalize();
+  const sideDirection = new THREE.Vector3()
+    .crossVectors(viewDirection, new THREE.Vector3(0, 1, 0))
+    .normalize();
+
+  const pullbackControl = fromPosition.clone()
+    .add(viewDirection.clone().multiplyScalar(MAP_PULLBACK_DISTANCE))
+    .add(new THREE.Vector3(0, MAP_PULLBACK_HEIGHT, 0))
+    .add(sideDirection.multiplyScalar(0.9));
+
+  const topApproachControl = toPosition.clone()
+    .lerp(pullbackControl, 0.22)
+    .add(new THREE.Vector3(0, 2.6, 0))
+    .add(sideDirection.multiplyScalar(0.35));
+
+  const targetMidpoint = fromTarget.clone().lerp(toTarget, 0.35).add(
+    new THREE.Vector3(0, 0.55, 0)
+  );
+
+  return {
+    positionCurve: new THREE.CubicBezierCurve3(
+      fromPosition,
+      pullbackControl,
+      topApproachControl,
+      toPosition
+    ),
+    targetCurve: new THREE.QuadraticBezierCurve3(
+      fromTarget,
+      targetMidpoint,
+      toTarget
+    )
+  };
+}
+
+function updateCameraTransition() {
+  if (!cameraTransition.active) {
+    return;
+  }
+
+  const elapsed = performance.now() - cameraTransition.startedAt;
+  const progress = Math.min(elapsed / CAMERA_TRANSITION_DURATION, 1);
+  const eased = smootherStep(progress);
+
+  if (cameraTransition.mode === 'map-enter' && cameraTransition.path) {
+    camera.position.copy(cameraTransition.path.positionCurve.getPoint(eased));
+    controls.target.copy(cameraTransition.path.targetCurve.getPoint(eased));
+  } else {
+    camera.position.lerpVectors(cameraTransition.fromPosition, cameraTransition.toPosition, eased);
+    controls.target.lerpVectors(cameraTransition.fromTarget, cameraTransition.toTarget, eased);
+  }
+
+  if (progress >= 1) {
+    cameraTransition.active = false;
+    cameraTransition.path = null;
+    camera.position.copy(cameraTransition.toPosition);
+    controls.target.copy(cameraTransition.toTarget);
+
+    if (currentView === 'map') {
+      controls.enableRotate = false;
+      controls.maxPolarAngle = 0.02;
+      controls.minPolarAngle = 0;
+      controls.minDistance = 10;
+      controls.maxDistance = 24;
+    }
+  }
+}
+
+function resetToVillageView() {
+  clearTimeout(popupDelayTimer);
+  closeLinkPopup();
+  currentFocusHouse = null;
+  focusRequest = null;
+  setView('village', { preserveFocus: false });
+}
+
 function triggerHouseFocus(house) {
   clearTimeout(popupDelayTimer);
   closeLinkPopup();
@@ -605,6 +736,9 @@ function triggerHouseFocus(house) {
 
 function syncUiState() {
   ui.mapToggle?.classList.toggle('is-active', currentView === 'map');
+  if (currentView !== 'village') {
+    hideHouseTooltip();
+  }
 
   ui.viewButtons.forEach((button) => {
     const isActive = currentFocusHouse?.userData?.id === button.dataset.view && currentView === 'village';
@@ -614,7 +748,7 @@ function syncUiState() {
   if (ui.hudNote) {
     ui.hudNote.classList.toggle('is-map', currentView === 'map');
     ui.hudNote.textContent = currentView === 'map'
-      ? 'MAP view: top-down camera with dotted overlay.'
+      ? 'MAP view: top-down overview.'
       : 'Drag to orbit. Click a house to zoom, then confirm.';
   }
 }
@@ -721,8 +855,12 @@ function updateHouseScales() {
 function animate() {
   requestAnimationFrame(animate);
 
-  camera.position.lerp(desiredCameraPosition, CAMERA_BLEND_SPEED);
-  controls.target.lerp(desiredTarget, CAMERA_BLEND_SPEED);
+  if (cameraTransition.active) {
+    updateCameraTransition();
+  } else {
+    camera.position.lerp(desiredCameraPosition, CAMERA_BLEND_SPEED);
+    controls.target.lerp(desiredTarget, CAMERA_BLEND_SPEED);
+  }
 
   updateViewTransition();
   updateHouseScales();

@@ -69,6 +69,11 @@
       gap: 10px;
     }
 
+    #view-nav {
+      display: flex;
+      gap: 10px;
+    }
+
     .nav-btn {
       background: rgba(20, 16, 40, 0.55);
       color: #f7eac0;
@@ -123,6 +128,48 @@
       background: rgba(18, 31, 40, 0.42);
     }
 
+    #house-tooltip {
+      position: fixed;
+      z-index: 1600;
+      min-width: 120px;
+      padding: 10px 12px;
+      border-radius: 14px;
+      border: 1px solid rgba(255, 220, 140, 0.28);
+      background: rgba(20, 16, 40, 0.9);
+      color: #fff4d8;
+      font-family: Georgia, serif;
+      box-shadow: 0 16px 34px rgba(0, 0, 0, 0.26);
+      backdrop-filter: blur(8px);
+      pointer-events: none;
+      opacity: 0;
+      transform: translate3d(0, 8px, 0) scale(0.98);
+      transition:
+        opacity 150ms ease,
+        transform 150ms ease;
+    }
+
+    #house-tooltip.is-visible {
+      opacity: 1;
+      transform: translate3d(0, 0, 0) scale(1);
+    }
+
+    .house-tooltip-label {
+      display: block;
+      margin-bottom: 2px;
+      color: #ffe7a8;
+      font-size: 13px;
+      font-weight: bold;
+      letter-spacing: 0.08em;
+    }
+
+    .house-tooltip-name {
+      display: block;
+      color: rgba(255, 244, 216, 0.76);
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
     @media (max-width: 720px) {
       #top-nav {
         padding: 16px 18px;
@@ -166,13 +213,16 @@
       <div class="nav-caption">STORYBOOK VILLAGE EXPERIENCE</div>
     </div>
     <div class="nav-right">
-      <button class="nav-btn" data-view="home">HOME</button>
-      <button class="nav-btn" data-view="gallery">GALLERY</button>
-      <button class="nav-btn" data-view="shop">SHOP</button>
+      <button class="nav-btn" id="reset-view">HOME</button>
+      <div id="view-nav"></div>
       <button class="nav-btn" id="map-toggle">MAP</button>
     </div>
   </nav>
   <div id="hud-note">Drag to orbit. Click a house to zoom, then confirm.</div>
+  <div id="house-tooltip" aria-hidden="true">
+    <span class="house-tooltip-label"></span>
+    <span class="house-tooltip-name"></span>
+  </div>
 
   <script type="module" src="./assets/js/main.js"></script>
 </body>
