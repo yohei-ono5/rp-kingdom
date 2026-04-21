@@ -11,6 +11,7 @@ const FOCUS_COMPLETE_DISTANCE = 0.32;
 const CAMERA_TRANSITION_DURATION = 1800;
 const MAP_PULLBACK_DISTANCE = 5.5;
 const MAP_PULLBACK_HEIGHT = 3.8;
+const INTRO_TRANSITION_DURATION = 2600;
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x1a1a2e);
@@ -22,7 +23,7 @@ const camera = new THREE.PerspectiveCamera(
   0.1,
   100
 );
-camera.position.set(10, 7, 18);
+camera.position.set(-1.5, 31, 24);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
@@ -35,7 +36,7 @@ document.body.appendChild(renderer.domElement);
 
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
-controls.target.set(0, 1.4, 0);
+controls.target.set(0, 10, 0);
 controls.minDistance = 8;
 controls.maxDistance = 28;
 controls.maxPolarAngle = Math.PI * 0.48;
@@ -75,6 +76,8 @@ const houseMaterials = [];
 const mapMarkerMeta = [];
 
 const ui = {
+  introOverlay: document.getElementById('intro-overlay'),
+  introEnter: document.getElementById('intro-enter'),
   resetView: document.getElementById('reset-view'),
   mapToggle: document.getElementById('map-toggle'),
   viewButtons: Array.from(document.querySelectorAll('.nav-btn[data-view]')),
@@ -89,7 +92,7 @@ let ambientLight = null;
 let sunLight = null;
 let fillLight = null;
 
-let currentView = 'village';
+let currentView = 'intro';
 let currentFocusHouse = null;
 let pendingUrl = null;
 let popupDelayTimer = 0;
@@ -98,6 +101,7 @@ let pointerDown = false;
 let dragMoved = false;
 let pointerStartX = 0;
 let pointerStartY = 0;
+let introActive = true;
 
 let focusRequest = null;
 
@@ -117,6 +121,10 @@ const cameraTransition = {
 };
 
 const cameraState = {
+  intro: {
+    position: new THREE.Vector3(-1.5, 31, 24),
+    target: new THREE.Vector3(0, 10, 0)
+  },
   village: {
     position: new THREE.Vector3(10, 7, 18),
     target: new THREE.Vector3(0, 1.4, 0)
@@ -128,6 +136,8 @@ const cameraState = {
 };
 
 const popup = createLinkPopup();
+
+document.body.classList.add('intro-active');
 
 initLights();
 initGround();
@@ -245,6 +255,18 @@ function createLinkPopup() {
 
   popupEl.closePopup = close;
   return popupEl;
+}
+
+function startIntroExperience() {
+  if (!introActive) {
+    return;
+  }
+
+  introActive = false;
+  document.body.classList.remove('intro-active');
+  ui.introOverlay?.classList.add('is-hidden');
+  ui.introOverlay?.setAttribute('aria-hidden', 'true');
+  resetToVillageView({ transitionMode: 'intro-enter' });
 }
 
 function openLinkPopup(name, url) {
@@ -411,6 +433,12 @@ function addEvents() {
   window.addEventListener('resize', onResize);
 
   window.addEventListener('keydown', (event) => {
+    if (introActive && event.key === 'Enter') {
+      event.preventDefault();
+      startIntroExperience();
+      return;
+    }
+
     if (event.key === 'Escape') closeLinkPopup();
   });
 
@@ -426,6 +454,10 @@ function addEvents() {
 
   ui.resetView?.addEventListener('click', () => {
     resetToVillageView();
+  });
+
+  ui.introEnter?.addEventListener('click', () => {
+    startIntroExperience();
   });
 
   ui.viewButtons.forEach((button) => {
@@ -446,7 +478,7 @@ function onResize() {
 }
 
 function onControlsChange() {
-  if (cameraTransition.active || currentView === 'map') {
+  if (introActive || cameraTransition.active || currentView === 'map') {
     return;
   }
 
@@ -455,6 +487,7 @@ function onControlsChange() {
 }
 
 function onPointerDown(event) {
+  if (introActive) return;
   pointerDown = true;
   dragMoved = false;
   pointerStartX = event.clientX;
@@ -462,6 +495,12 @@ function onPointerDown(event) {
 }
 
 function onPointerMove(event) {
+  if (introActive) {
+    hideHouseTooltip();
+    document.body.style.cursor = 'default';
+    return;
+  }
+
   if (pointerDown) {
     const dx = event.clientX - pointerStartX;
     const dy = event.clientY - pointerStartY;
@@ -494,6 +533,7 @@ function onPointerMove(event) {
 }
 
 function onPointerUp(event) {
+  if (introActive) return;
   if (!pointerDown) return;
   pointerDown = false;
 
@@ -557,7 +597,7 @@ function getHoveredHouse(event) {
 
 function setView(view, options = {}) {
   const previousView = currentView;
-  const transitionMode = resolveCameraTransitionMode(previousView, view);
+  const transitionMode = options.transitionMode || resolveCameraTransitionMode(previousView, view);
   currentView = view;
 
   if (!options.preserveFocus) {
@@ -575,7 +615,15 @@ function setView(view, options = {}) {
 }
 
 function applyViewState(options = {}) {
-  if (currentView === 'map') {
+  if (currentView === 'intro') {
+    desiredCameraPosition.copy(cameraState.intro.position);
+    desiredTarget.copy(cameraState.intro.target);
+    controls.enableRotate = false;
+    controls.maxPolarAngle = Math.PI * 0.48;
+    controls.minPolarAngle = 0;
+    controls.minDistance = 8;
+    controls.maxDistance = 28;
+  } else if (currentView === 'map') {
     desiredCameraPosition.copy(cameraState.map.position);
     desiredTarget.copy(cameraState.map.target);
     const deferMapLock = options.transitionMode === 'map-enter';
@@ -594,7 +642,7 @@ function applyViewState(options = {}) {
   } else {
     desiredCameraPosition.copy(cameraState.village.position);
     desiredTarget.copy(cameraState.village.target);
-    controls.enableRotate = true;
+    controls.enableRotate = options.transitionMode === 'intro-enter' ? false : true;
     controls.maxPolarAngle = Math.PI * 0.48;
     controls.minPolarAngle = 0;
     controls.minDistance = 8;
@@ -613,6 +661,10 @@ function applyFocusCamera(house) {
 }
 
 function resolveCameraTransitionMode(previousView, nextView) {
+  if (previousView === 'intro' && nextView === 'village') {
+    return 'intro-enter';
+  }
+
   if (previousView !== 'map' && nextView === 'map') {
     return 'map-enter';
   }
@@ -629,7 +681,9 @@ function startCameraTransition(mode) {
   cameraTransition.toTarget.copy(desiredTarget);
   cameraTransition.path = mode === 'map-enter'
     ? createMapEnterTransitionPath()
-    : null;
+    : mode === 'intro-enter'
+      ? createIntroEnterTransitionPath()
+      : null;
   cameraTransition.active =
     cameraTransition.fromPosition.distanceTo(cameraTransition.toPosition) > 0.01
     || cameraTransition.fromTarget.distanceTo(cameraTransition.toTarget) > 0.01;
@@ -679,16 +733,50 @@ function createMapEnterTransitionPath() {
   };
 }
 
+function createIntroEnterTransitionPath() {
+  const fromPosition = cameraTransition.fromPosition.clone();
+  const fromTarget = cameraTransition.fromTarget.clone();
+  const toPosition = cameraTransition.toPosition.clone();
+  const toTarget = cameraTransition.toTarget.clone();
+
+  const firstControl = fromPosition.clone().lerp(toPosition, 0.18).add(
+    new THREE.Vector3(-1.6, 5.5, 2.8)
+  );
+  const secondControl = fromPosition.clone().lerp(toPosition, 0.72).add(
+    new THREE.Vector3(1.8, 3.4, -2.6)
+  );
+  const targetMidpoint = fromTarget.clone().lerp(toTarget, 0.56).add(
+    new THREE.Vector3(0, -1.2, 0)
+  );
+
+  return {
+    positionCurve: new THREE.CubicBezierCurve3(
+      fromPosition,
+      firstControl,
+      secondControl,
+      toPosition
+    ),
+    targetCurve: new THREE.QuadraticBezierCurve3(
+      fromTarget,
+      targetMidpoint,
+      toTarget
+    )
+  };
+}
+
 function updateCameraTransition() {
   if (!cameraTransition.active) {
     return;
   }
 
+  const duration = cameraTransition.mode === 'intro-enter'
+    ? INTRO_TRANSITION_DURATION
+    : CAMERA_TRANSITION_DURATION;
   const elapsed = performance.now() - cameraTransition.startedAt;
-  const progress = Math.min(elapsed / CAMERA_TRANSITION_DURATION, 1);
+  const progress = Math.min(elapsed / duration, 1);
   const eased = smootherStep(progress);
 
-  if (cameraTransition.mode === 'map-enter' && cameraTransition.path) {
+  if ((cameraTransition.mode === 'map-enter' || cameraTransition.mode === 'intro-enter') && cameraTransition.path) {
     camera.position.copy(cameraTransition.path.positionCurve.getPoint(eased));
     controls.target.copy(cameraTransition.path.targetCurve.getPoint(eased));
   } else {
@@ -708,16 +796,22 @@ function updateCameraTransition() {
       controls.minPolarAngle = 0;
       controls.minDistance = 10;
       controls.maxDistance = 24;
+    } else {
+      controls.enableRotate = !introActive;
+      controls.maxPolarAngle = Math.PI * 0.48;
+      controls.minPolarAngle = 0;
+      controls.minDistance = 8;
+      controls.maxDistance = 28;
     }
   }
 }
 
-function resetToVillageView() {
+function resetToVillageView(options = {}) {
   clearTimeout(popupDelayTimer);
   closeLinkPopup();
   currentFocusHouse = null;
   focusRequest = null;
-  setView('village', { preserveFocus: false });
+  setView('village', { preserveFocus: false, ...options });
 }
 
 function triggerHouseFocus(house) {
@@ -747,9 +841,11 @@ function syncUiState() {
 
   if (ui.hudNote) {
     ui.hudNote.classList.toggle('is-map', currentView === 'map');
-    ui.hudNote.textContent = currentView === 'map'
-      ? 'MAP view: top-down overview.'
-      : 'Drag to orbit. Click a house to zoom, then confirm.';
+    ui.hudNote.textContent = introActive
+      ? 'Enter the clouds to begin.'
+      : currentView === 'map'
+        ? 'MAP view: top-down overview.'
+        : 'Drag to orbit. Click a house to zoom, then confirm.';
   }
 }
 
