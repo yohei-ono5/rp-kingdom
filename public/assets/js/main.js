@@ -51,12 +51,12 @@ const desiredTarget = controls.target.clone();
 
 const backgroundColors = {
   village: new THREE.Color(0x1a1a2e),
-  map: new THREE.Color(0x10232d)
+  map: new THREE.Color(0x1a1a2e)
 };
 
 const fogColors = {
   village: new THREE.Color(0x1a1a2e),
-  map: new THREE.Color(0x10232d)
+  map: new THREE.Color(0x1a1a2e)
 };
 
 const sunPositions = {
@@ -556,12 +556,14 @@ function applyViewState(options = {}) {
   if (currentView === 'map') {
     desiredCameraPosition.copy(cameraState.map.position);
     desiredTarget.copy(cameraState.map.target);
-    controls.maxPolarAngle = Math.PI * 0.495;
+    controls.enableRotate = false;
+    controls.maxPolarAngle = 0.02;
     controls.minPolarAngle = 0;
     controls.minDistance = 10;
-    controls.maxDistance = 30;
+    controls.maxDistance = 24;
   } else if (currentFocusHouse && options.preserveFocus !== false) {
     applyFocusCamera(currentFocusHouse);
+    controls.enableRotate = true;
     controls.maxPolarAngle = Math.PI * 0.48;
     controls.minPolarAngle = 0;
     controls.minDistance = 6.5;
@@ -569,6 +571,7 @@ function applyViewState(options = {}) {
   } else {
     desiredCameraPosition.copy(cameraState.village.position);
     desiredTarget.copy(cameraState.village.target);
+    controls.enableRotate = true;
     controls.maxPolarAngle = Math.PI * 0.48;
     controls.minPolarAngle = 0;
     controls.minDistance = 8;
@@ -651,12 +654,12 @@ function updateViewTransition() {
 
   if (ground) {
     ground.material.color.setRGB(
-      THREE.MathUtils.lerp(0.184, 0.082, viewTransition.progress),
-      THREE.MathUtils.lerp(0.42, 0.19, viewTransition.progress),
-      THREE.MathUtils.lerp(0.231, 0.24, viewTransition.progress)
+      THREE.MathUtils.lerp(0.184, 0.23, viewTransition.progress),
+      THREE.MathUtils.lerp(0.42, 0.47, viewTransition.progress),
+      THREE.MathUtils.lerp(0.231, 0.32, viewTransition.progress)
     );
-    ground.material.roughness = THREE.MathUtils.lerp(0.96, 0.72, viewTransition.progress);
-    ground.material.metalness = THREE.MathUtils.lerp(0.0, 0.12, viewTransition.progress);
+    ground.material.roughness = THREE.MathUtils.lerp(0.96, 0.9, viewTransition.progress);
+    ground.material.metalness = THREE.MathUtils.lerp(0.0, 0.0, viewTransition.progress);
   }
 
   if (ambientLight) {
@@ -680,8 +683,6 @@ function updateViewTransition() {
     material.opacity = baseOpacity * viewTransition.progress;
   });
 
-  mapOverlayGroup.rotation.y += 0.0015 + viewTransition.progress * 0.0025;
-
   const rings = mapOverlayGroup.userData.rings || [];
   rings.forEach((ring, index) => {
     ring.scale.setScalar(1 + Math.sin(performance.now() * 0.0014 + index) * 0.015);
@@ -691,8 +692,9 @@ function updateViewTransition() {
     marker.mesh.position.y = marker.homeY + Math.sin(performance.now() * 0.002 + index) * 0.03 * viewTransition.progress;
   });
 
+  const targetMapLift = 0;
   villageGroup.children.forEach((house) => {
-    house.userData.mapLift += ((currentView === 'map' ? 0.2 : 0) - house.userData.mapLift) * 0.08;
+    house.userData.mapLift += (targetMapLift - house.userData.mapLift) * 0.08;
     house.position.y = house.userData.mapLift;
   });
 
