@@ -120,6 +120,7 @@ const sunPositions = {
 
 const overlayMaterials = [];
 const houseMaterials = [];
+const houseLights = [];
 const mapMarkerMeta = [];
 const landPlotTargets = [];
 const landPlotMeta = [];
@@ -129,6 +130,8 @@ const ui = {
   introEnter: document.getElementById('intro-enter'),
   resetView: document.getElementById('reset-view'),
   mapToggle: document.getElementById('map-toggle'),
+  topNav: document.getElementById('top-nav'),
+  navMenuToggle: document.getElementById('nav-menu-toggle'),
   viewButtons: Array.from(document.querySelectorAll('.nav-btn[data-view]')),
   hudNote: document.getElementById('hud-note'),
   houseTooltip: document.getElementById('house-tooltip'),
@@ -231,8 +234,24 @@ const interaction = createSceneInteractionController({
   onCameraManualChange: () => {
     desiredCameraPosition.copy(camera.position);
     desiredTarget.copy(controls.target);
-  }
+  },
+  onToggleNavMenu: () => toggleNavMenu(),
+  onCloseNavMenu: () => closeNavMenu()
 });
+
+function toggleNavMenu() {
+  if (!ui.topNav) return;
+  const open = !ui.topNav.classList.contains('is-nav-open');
+  ui.topNav.classList.toggle('is-nav-open', open);
+  ui.navMenuToggle?.setAttribute('aria-expanded', open ? 'true' : 'false');
+}
+
+function closeNavMenu() {
+  if (!ui.topNav) return;
+  if (!ui.topNav.classList.contains('is-nav-open')) return;
+  ui.topNav.classList.remove('is-nav-open');
+  ui.navMenuToggle?.setAttribute('aria-expanded', 'false');
+}
 
 document.body.classList.add('intro-active');
 
@@ -251,7 +270,8 @@ void loadWorldObjects({
   mapOverlayGroup,
   overlayMaterials,
   mapMarkerMeta,
-  houseMaterials
+  houseMaterials,
+  houseLights
 });
 interaction.bindEvents();
 timeOfDay.update(true);
@@ -600,6 +620,18 @@ function updateViewTransition() {
     if ('roughness' in material) {
       material.roughness = THREE.MathUtils.lerp(0.96, 0.58, viewTransition.progress);
     }
+  });
+
+  const nightFactor = THREE.MathUtils.clamp(
+    (0.65 - timeOfDayState.sunIntensity) / 0.55,
+    0,
+    1
+  );
+  const mapDim = 1 - viewTransition.progress * 0.55;
+  houseLights.forEach((light) => {
+    const baseIntensity = light.color.getHex() === 0xffd08a ? 1.4 : 2.2;
+    const target = baseIntensity * nightFactor * mapDim;
+    light.intensity += (target - light.intensity) * 0.08;
   });
 }
 

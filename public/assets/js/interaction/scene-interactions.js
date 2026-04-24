@@ -19,13 +19,16 @@ export function createSceneInteractionController({
   onToggleMap,
   onResetView,
   onFocusHouse,
-  onCameraManualChange
+  onCameraManualChange,
+  onToggleNavMenu,
+  onCloseNavMenu
 }) {
   let pointerDown = false;
   let dragMoved = false;
   let pointerStartX = 0;
   let pointerStartY = 0;
   let currentHoverPlot = null;
+  let selectedPlot = null;
 
   function bindEvents() {
     window.addEventListener('resize', onResize);
@@ -37,7 +40,10 @@ export function createSceneInteractionController({
         return;
       }
 
-      if (event.key === 'Escape') onClosePopup();
+      if (event.key === 'Escape') {
+        onClosePopup();
+        onCloseNavMenu?.();
+      }
     });
 
     renderer.domElement.addEventListener('pointerdown', onPointerDown);
@@ -48,14 +54,27 @@ export function createSceneInteractionController({
 
     ui.mapToggle?.addEventListener('click', () => {
       onToggleMap();
+      onCloseNavMenu?.();
     });
 
     ui.resetView?.addEventListener('click', () => {
       onResetView();
+      onCloseNavMenu?.();
     });
 
     ui.introEnter?.addEventListener('click', () => {
       onStartIntro();
+    });
+
+    ui.navMenuToggle?.addEventListener('click', (event) => {
+      event.stopPropagation();
+      onToggleNavMenu?.();
+    });
+
+    document.addEventListener('click', (event) => {
+      if (!ui.topNav || !ui.topNav.contains(event.target)) {
+        onCloseNavMenu?.();
+      }
     });
 
     ui.viewButtons.forEach((button) => {
@@ -65,6 +84,7 @@ export function createSceneInteractionController({
 
         if (!house) return;
         onFocusHouse(house);
+        onCloseNavMenu?.();
       });
     });
   }
@@ -72,6 +92,14 @@ export function createSceneInteractionController({
   function hideHoverOverlays() {
     hideHouseTooltip();
     hidePlotPanel();
+    selectedPlot = null;
+  }
+
+  function hideTransientHovers() {
+    hideHouseTooltip();
+    if (!selectedPlot) {
+      hidePlotPanel();
+    }
   }
 
   function resetHoverState() {
@@ -82,13 +110,14 @@ export function createSceneInteractionController({
     });
 
     landPlotGroup.children.forEach((plot) => {
-      plot.userData.targetHoverScale = 1;
-      plot.userData.targetLift = 0;
+      const isSelected = plot === selectedPlot;
+      plot.userData.targetHoverScale = isSelected ? 1.035 : 1;
+      plot.userData.targetLift = isSelected ? 0.18 : 0;
     });
   }
 
   function getCurrentHoverPlot() {
-    return currentHoverPlot;
+    return currentHoverPlot || selectedPlot;
   }
 
   function onResize() {
@@ -130,8 +159,12 @@ export function createSceneInteractionController({
       }
     }
 
+    if (event.pointerType === 'touch') {
+      return;
+    }
+
     if (isPopupOpen()) {
-      hideHoverOverlays();
+      hideTransientHovers();
       document.body.style.cursor = 'default';
       return;
     }
@@ -150,20 +183,21 @@ export function createSceneInteractionController({
 
     landPlotGroup.children.forEach((plot) => {
       const isHovered = hoveredPlot === plot && getCurrentView() === 'village';
-      plot.userData.targetHoverScale = isHovered ? 1.035 : 1;
-      plot.userData.targetLift = isHovered ? 0.18 : 0;
+      const isSelected = plot === selectedPlot;
+      plot.userData.targetHoverScale = isHovered || isSelected ? 1.035 : 1;
+      plot.userData.targetLift = isHovered || isSelected ? 0.18 : 0;
     });
 
     currentHoverPlot = showPlotState ? hoveredPlot : null;
 
     if (showHoverState) {
       showHouseTooltip(hoveredHouse, event);
-      hidePlotPanel();
+      if (!selectedPlot) hidePlotPanel();
     } else if (showPlotState) {
       hideHouseTooltip();
       showPlotPanel(hoveredPlot);
     } else {
-      hideHoverOverlays();
+      hideTransientHovers();
     }
   }
 
@@ -175,14 +209,33 @@ export function createSceneInteractionController({
     if (dragMoved) return;
     if (isPopupOpen()) return;
 
+    const isTouch = event.pointerType === 'touch';
     const clickedTarget = getHoveredTarget(event);
+
     if (clickedTarget?.type === 'plot') {
+      if (isTouch) {
+        const plot = clickedTarget.object;
+        if (selectedPlot === plot) {
+          selectedPlot = null;
+          hidePlotPanel();
+        } else {
+          selectedPlot = plot;
+          showPlotPanel(plot);
+        }
+      }
       return;
+    }
+
+    if (isTouch && selectedPlot) {
+      selectedPlot = null;
+      hidePlotPanel();
     }
 
     const clickedHouse = clickedTarget?.type === 'house' ? clickedTarget.object : null;
     if (!clickedHouse?.userData.url) return;
 
+    selectedPlot = null;
+    hidePlotPanel();
     onFocusHouse(clickedHouse);
   }
 
@@ -190,7 +243,7 @@ export function createSceneInteractionController({
     pointerDown = false;
     dragMoved = false;
     document.body.style.cursor = 'default';
-    hideHoverOverlays();
+    hideTransientHovers();
     resetHoverState();
   }
 

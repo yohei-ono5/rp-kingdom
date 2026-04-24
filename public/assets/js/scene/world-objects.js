@@ -23,7 +23,8 @@ export async function loadWorldObjects({
   mapOverlayGroup,
   overlayMaterials,
   mapMarkerMeta,
-  houseMaterials
+  houseMaterials,
+  houseLights
 }) {
   const loader = new GLTFLoader();
   const templateCache = new Map();
@@ -52,7 +53,8 @@ export async function loadWorldObjects({
       villageGroup,
       mapOverlayGroup,
       overlayMaterials,
-      mapMarkerMeta
+      mapMarkerMeta,
+      houseLights
     });
   }
 }
@@ -63,7 +65,8 @@ function addWorldObject({
   villageGroup,
   mapOverlayGroup,
   overlayMaterials,
-  mapMarkerMeta
+  mapMarkerMeta,
+  houseLights
 }) {
   const model = template.clone(true);
   const wrapper = new THREE.Group();
@@ -85,6 +88,22 @@ function addWorldObject({
   wrapper.position.set(...data.position);
   wrapper.rotation.y = data.rotationY || 0;
   wrapper.scale.setScalar(data.scale);
+
+  if (houseLights) {
+    const windowLight = new THREE.PointLight(0xffb566, 0, 6.5, 1.6);
+    windowLight.position.set(0, 1.9, 0);
+    wrapper.add(windowLight);
+
+    const lanternLight = new THREE.PointLight(0xffd08a, 0, 3.2, 1.8);
+    lanternLight.position.set(
+      data.doorOffset ? data.doorOffset[0] : DEFAULT_DOOR_OFFSET[0],
+      0.6,
+      data.doorOffset ? data.doorOffset[2] + 0.25 : DEFAULT_DOOR_OFFSET[2] + 0.25
+    );
+    wrapper.add(lanternLight);
+
+    houseLights.push(windowLight, lanternLight);
+  }
 
   villageGroup.add(wrapper);
   createMapMarker({

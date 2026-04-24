@@ -35,10 +35,13 @@
 - 日本時間の時計を表示し、時間帯（深夜/朝焼け/昼/午後/夕暮れ/夜）で空、フォグ、地面、3 種のライト、トーンマッピング露出を補間
 - `?hour=<0-23>` クエリで時刻を固定できる（テスト用）
 - 夜間は星空（カメラ追従の Points）と月（Sprite ハロー付き）がフェードイン
+- 夜間は各ハウスに窓明かり/玄関ランタンの `PointLight` が自動で灯る（`timeOfDayState.sunIntensity` を元にした nightFactor で減衰、MAP 時は弱める）
 - 売地/広告枠区画は `FOR SALE` 看板、境界線、杭で構成した 3D オブジェクトとして表示
-- 売地/広告枠区画にホバーすると右下パネルに詳細を表示し、区画が僅かに浮き上がる
+- PC では売地/広告枠区画ホバーで右下パネルに詳細を表示し、区画が僅かに浮き上がる
+- スマホ（タッチ入力）では区画タップで詳細パネルを固定表示。同じ区画の再タップ or 他の場所タップで閉じる
 - 村ビューでは建物ホバー時に建物名ツールチップを表示、建物が 1.04 倍にスケール
 - ドラッグ閾値（6px）を超えた pointerup ではクリック判定しない
+- スマホ幅（≤720px）ではナビ右側がハンバーガーボタン＋ドロップダウンに切替。ボタン押下 / ナビ外タップ / Esc で自動クローズ
 - 高 DPI 画面は `MAX_RENDER_PIXEL_RATIO = 1.35` でクランプ、シャドウマップは 1024
 
 ## 運用メモ
@@ -52,6 +55,9 @@
 - `HOME` の通常ビュー位置は `public/assets/js/main.js` の `cameraState.village`
 - フォーカスカメラの距離・高さは `public/assets/js/main.js` の `FOCUS_CAMERA_OPTIONS`
 - 時間帯ごとの光の調整は `public/assets/js/systems/time-of-day.js` の `timeOfDayStops`
+- 夜のハウス明かり（色・距離・基準強度）は `public/assets/js/scene/world-objects.js` の `PointLight` 生成部、点灯カーブは `public/assets/js/main.js` の `nightFactor` 式
 - 夜空の表示量や星・月の挙動は `public/assets/js/scene/sky-objects.js`
 - 確認ポップアップの見た目は `public/assets/js/ui/link-popup.js`（インラインスタイルで DOM 生成）
+- スマホ用ハンバーガー／ドロワーのスタイルは `public/index.html` の `.nav-menu-toggle` と `@media (max-width: 720px)` 内の `.nav-right`
+- スマホでの区画タップ選択ロジックは `public/assets/js/interaction/scene-interactions.js` の `selectedPlot` 関連
 - 描画負荷が高い場合は `MAX_RENDER_PIXEL_RATIO` または `SHADOW_MAP_SIZE` を下げる
