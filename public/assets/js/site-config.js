@@ -1,32 +1,57 @@
+const STANDARD_HOUSE_MODEL_URL = new URL('../models/Fantasy_House_6.glb', import.meta.url).href;
+const ARTIST_HOUSE_MODEL_URL = new URL('../models/Fantasy_House.glb', import.meta.url).href;
+
 export const HOUSE_DESTINATIONS = [
   {
     id: 'home',
     label: 'COMPANY',
-    name: 'Company House',
+    name: 'Company',
     url: 'https://thecrown-pro.com/',
+    modelUrl: STANDARD_HOUSE_MODEL_URL,
     position: [-4.5, 0, -1.8],
     scale: 0.72,
-    rotationY: 0.08
+    rotationY: 0.08,
+    doorOffset: [0.08, 0, 0.92],
+    doorFacing: [0, 0, 1]
   },
   {
     id: 'youtube',
     label: 'YOUTUBE',
     name: 'YouTube House',
     url: 'https://www.youtube.com/@Rujie-official',
+    modelUrl: STANDARD_HOUSE_MODEL_URL,
     position: [-11.5, 0, 6.8],
     scale: 0.68,
-    rotationY: -0.28
+    rotationY: -0.28,
+    doorOffset: [0.08, 0, 0.92],
+    doorFacing: [0, 0, 1]
   },
   {
     id: 'shop',
     label: 'SHOP',
     name: 'Official Store',
     url: 'https://store.rujie-official.com/',
+    modelUrl: STANDARD_HOUSE_MODEL_URL,
     position: [7.8, 0, -6.5],
     scale: 0.7,
-    rotationY: 0.35
+    rotationY: 0.35,
+    doorOffset: [0.08, 0, 0.92],
+    doorFacing: [0, 0, 1]
   }
 ];
+
+export const FRONT_HOUSE_DESTINATION = {
+  id: 'artist',
+  label: 'ARTIST',
+  name: 'Artist House',
+  url: 'https://artist.rujie-official.com/',
+  modelUrl: ARTIST_HOUSE_MODEL_URL,
+  position: [9.8, 0, 8.6],
+  scale: 0.76,
+  rotationY: -0.18,
+  doorOffset: [0.48, 0, 0.58],
+  doorFacing: [0, 0, 1]
+};
 
 export const LAND_PLOTS = [
   {
