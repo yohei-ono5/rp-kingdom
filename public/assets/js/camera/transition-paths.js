@@ -9,6 +9,10 @@ export function resolveCameraTransitionMode(previousView, nextView) {
     return 'map-enter';
   }
 
+  if (previousView === 'map' && nextView === 'village') {
+    return 'map-exit';
+  }
+
   return 'direct';
 }
 
@@ -41,6 +45,15 @@ export function createCameraTransitionPath({
     });
   }
 
+  if (mode === 'map-exit') {
+    return createMapExitTransitionPath({
+      fromPosition,
+      fromTarget,
+      toPosition,
+      toTarget
+    });
+  }
+
   return null;
 }
 
@@ -48,34 +61,64 @@ function createMapEnterTransitionPath({
   fromPosition,
   fromTarget,
   toPosition,
-  toTarget,
-  mapPullbackDistance,
-  mapPullbackHeight
+  toTarget
 }) {
-  const viewDirection = fromPosition.clone().sub(fromTarget).normalize();
-  const sideDirection = new THREE.Vector3()
-    .crossVectors(viewDirection, new THREE.Vector3(0, 1, 0))
-    .normalize();
+  const ascendControl = new THREE.Vector3(
+    THREE.MathUtils.lerp(fromPosition.x, toPosition.x, 0.12),
+    THREE.MathUtils.lerp(fromPosition.y, toPosition.y, 0.7),
+    THREE.MathUtils.lerp(fromPosition.z, toPosition.z, 0.12)
+  );
+  const cruiseControl = new THREE.Vector3(
+    THREE.MathUtils.lerp(fromPosition.x, toPosition.x, 0.55),
+    THREE.MathUtils.lerp(fromPosition.y, toPosition.y, 0.92),
+    THREE.MathUtils.lerp(fromPosition.z, toPosition.z, 0.55)
+  );
 
-  const pullbackControl = fromPosition.clone()
-    .add(viewDirection.clone().multiplyScalar(mapPullbackDistance))
-    .add(new THREE.Vector3(0, mapPullbackHeight, 0))
-    .add(sideDirection.multiplyScalar(0.9));
-
-  const topApproachControl = toPosition.clone()
-    .lerp(pullbackControl, 0.22)
-    .add(new THREE.Vector3(0, 2.6, 0))
-    .add(sideDirection.multiplyScalar(0.35));
-
-  const targetMidpoint = fromTarget.clone().lerp(toTarget, 0.35).add(
-    new THREE.Vector3(0, 0.55, 0)
+  const targetMidpoint = fromTarget.clone().lerp(toTarget, 0.5).add(
+    new THREE.Vector3(0, 0.4, 0)
   );
 
   return {
     positionCurve: new THREE.CubicBezierCurve3(
       fromPosition,
-      pullbackControl,
-      topApproachControl,
+      ascendControl,
+      cruiseControl,
+      toPosition
+    ),
+    targetCurve: new THREE.QuadraticBezierCurve3(
+      fromTarget,
+      targetMidpoint,
+      toTarget
+    )
+  };
+}
+
+function createMapExitTransitionPath({
+  fromPosition,
+  fromTarget,
+  toPosition,
+  toTarget
+}) {
+  const overTargetControl = new THREE.Vector3(
+    toTarget.x,
+    THREE.MathUtils.lerp(fromPosition.y, toPosition.y, 0.1),
+    toTarget.z
+  );
+  const settlingControl = new THREE.Vector3(
+    toPosition.x,
+    THREE.MathUtils.lerp(fromPosition.y, toPosition.y, 0.7),
+    toPosition.z
+  );
+
+  const targetMidpoint = fromTarget.clone().lerp(toTarget, 0.65).add(
+    new THREE.Vector3(0, 0.3, 0)
+  );
+
+  return {
+    positionCurve: new THREE.CubicBezierCurve3(
+      fromPosition,
+      overTargetControl,
+      settlingControl,
       toPosition
     ),
     targetCurve: new THREE.QuadraticBezierCurve3(
@@ -92,21 +135,25 @@ function createIntroEnterTransitionPath({
   toPosition,
   toTarget
 }) {
-  const firstControl = fromPosition.clone().lerp(toPosition, 0.18).add(
-    new THREE.Vector3(-1.6, 5.5, 2.8)
+  const driftControl = new THREE.Vector3(
+    THREE.MathUtils.lerp(fromPosition.x, toPosition.x, 0.22),
+    THREE.MathUtils.lerp(fromPosition.y, toPosition.y, 0.32),
+    THREE.MathUtils.lerp(fromPosition.z, toPosition.z, 0.22)
   );
-  const secondControl = fromPosition.clone().lerp(toPosition, 0.72).add(
-    new THREE.Vector3(1.8, 3.4, -2.6)
+  const settlingControl = new THREE.Vector3(
+    THREE.MathUtils.lerp(fromPosition.x, toPosition.x, 0.78),
+    THREE.MathUtils.lerp(fromPosition.y, toPosition.y, 0.78),
+    THREE.MathUtils.lerp(fromPosition.z, toPosition.z, 0.78)
   );
-  const targetMidpoint = fromTarget.clone().lerp(toTarget, 0.56).add(
-    new THREE.Vector3(0, -1.2, 0)
+  const targetMidpoint = fromTarget.clone().lerp(toTarget, 0.5).add(
+    new THREE.Vector3(0, 0.5, 0)
   );
 
   return {
     positionCurve: new THREE.CubicBezierCurve3(
       fromPosition,
-      firstControl,
-      secondControl,
+      driftControl,
+      settlingControl,
       toPosition
     ),
     targetCurve: new THREE.QuadraticBezierCurve3(

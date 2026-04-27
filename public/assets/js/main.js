@@ -31,14 +31,19 @@ const MAP_PULLBACK_HEIGHT = 3.8;
 const INTRO_TRANSITION_DURATION = 2600;
 const FOG_NEAR = 28;
 const FOG_FAR = 70;
+const MAP_FOG_NEAR = 60;
+const MAP_FOG_FAR = 180;
+const MAP_CAMERA_HEIGHT = 75;
+const MAP_MIN_DISTANCE = 40;
+const MAP_MAX_DISTANCE = 95;
 const MAX_RENDER_PIXEL_RATIO = 1.35;
 const SHADOW_MAP_SIZE = 1024;
 const DOOR_POPUP_HEIGHT = 1.85;
 const FOCUS_CAMERA_OPTIONS = Object.freeze({
-  cameraDistance: 2.8,
-  cameraHeight: 1.55,
+  cameraDistance: 4.4,
+  cameraHeight: 1.95,
   targetInset: 0.28,
-  targetHeight: 1.05
+  targetHeight: 1.15
 });
 const fixedHour = resolveFixedHour();
 
@@ -52,7 +57,7 @@ const camera = new THREE.PerspectiveCamera(
   0.1,
   100
 );
-camera.position.set(-1.5, 31, 24);
+camera.position.set(-0.8, MAP_CAMERA_HEIGHT, 5.0);
 
 const renderer = new THREE.WebGLRenderer({
   antialias: true,
@@ -68,10 +73,10 @@ document.body.appendChild(renderer.domElement);
 
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
-controls.target.set(0, 10, 0);
-controls.minDistance = 8;
-controls.maxDistance = 28;
-controls.maxPolarAngle = Math.PI * 0.48;
+controls.target.set(-0.8, 0, 1.2);
+controls.minDistance = 0.1;
+controls.maxDistance = 250;
+controls.maxPolarAngle = Math.PI * 0.5;
 
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
@@ -138,7 +143,7 @@ const ui = {
   houseTooltipLabel: document.querySelector('.house-tooltip-label'),
   houseTooltipName: document.querySelector('.house-tooltip-name'),
   todClock: document.getElementById('tod-clock'),
-  todLabel: document.getElementById('tod-label'),
+  compass: document.getElementById('compass-widget'),
   plotPanel: document.getElementById('plot-panel'),
   plotPanelStatus: document.querySelector('.plot-panel-status'),
   plotPanelId: document.querySelector('.plot-panel-id'),
@@ -177,22 +182,21 @@ const cameraTransition = {
 
 const cameraState = {
   intro: {
-    position: new THREE.Vector3(-1.5, 31, 24),
-    target: new THREE.Vector3(0, 10, 0)
+    position: new THREE.Vector3(-0.8, MAP_CAMERA_HEIGHT, 5.0),
+    target: new THREE.Vector3(-0.8, 0, 1.2)
   },
   village: {
     position: new THREE.Vector3(13.5, 15.5, 25.5),
     target: new THREE.Vector3(-1.6, 0.8, 1.6)
   },
   map: {
-    position: new THREE.Vector3(-0.8, 28, 1.2),
+    position: new THREE.Vector3(-0.8, MAP_CAMERA_HEIGHT, 5.0),
     target: new THREE.Vector3(-0.8, 0, 1.2)
   }
 };
 
 const timeOfDay = createTimeOfDayController({
   clockElement: ui.todClock,
-  labelElement: ui.todLabel,
   fixedHour
 });
 const timeOfDayState = timeOfDay.state;
@@ -325,7 +329,16 @@ function initLights() {
   sunLight.position.set(8, 12, 6);
   sunLight.castShadow = true;
   sunLight.shadow.mapSize.set(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
+  sunLight.shadow.camera.left = -25;
+  sunLight.shadow.camera.right = 25;
+  sunLight.shadow.camera.top = 25;
+  sunLight.shadow.camera.bottom = -25;
+  sunLight.shadow.camera.near = 0.5;
+  sunLight.shadow.camera.far = 60;
+  sunLight.shadow.bias = -0.0005;
+  sunLight.shadow.camera.updateProjectionMatrix();
   scene.add(sunLight);
+  scene.add(sunLight.target);
 
   fillLight = new THREE.DirectionalLight(0x8ba1ff, 0.82);
   fillLight.position.set(-6, 5, -4);
@@ -374,25 +387,25 @@ function applyViewState(options = {}) {
     desiredCameraPosition.copy(cameraState.intro.position);
     desiredTarget.copy(cameraState.intro.target);
     controls.enableRotate = false;
-    controls.maxPolarAngle = Math.PI * 0.48;
+    controls.maxPolarAngle = Math.PI * 0.5;
     controls.minPolarAngle = 0;
-    controls.minDistance = 8;
-    controls.maxDistance = 28;
+    controls.minDistance = 0.1;
+    controls.maxDistance = 250;
   } else if (currentView === 'map') {
     desiredCameraPosition.copy(cameraState.map.position);
     desiredTarget.copy(cameraState.map.target);
     const deferMapLock = options.transitionMode === 'map-enter';
     controls.enableRotate = deferMapLock;
-    controls.maxPolarAngle = deferMapLock ? Math.PI * 0.48 : 0.02;
+    controls.maxPolarAngle = deferMapLock ? Math.PI * 0.48 : 0.08;
     controls.minPolarAngle = 0;
-    controls.minDistance = 16;
-    controls.maxDistance = 34;
+    controls.minDistance = MAP_MIN_DISTANCE;
+    controls.maxDistance = MAP_MAX_DISTANCE;
   } else if (currentFocusHouse && options.preserveFocus !== false) {
     applyFocusCamera(currentFocusHouse);
     controls.enableRotate = true;
     controls.maxPolarAngle = Math.PI * 0.48;
     controls.minPolarAngle = 0;
-    controls.minDistance = 6.5;
+    controls.minDistance = 1.5;
     controls.maxDistance = 28;
   } else {
     desiredCameraPosition.copy(cameraState.village.position);
@@ -435,6 +448,14 @@ function startCameraTransition(mode) {
   cameraTransition.active =
     cameraTransition.fromPosition.distanceTo(cameraTransition.toPosition) > 0.01
     || cameraTransition.fromTarget.distanceTo(cameraTransition.toTarget) > 0.01;
+
+  if (cameraTransition.active) {
+    controls.enableRotate = false;
+    controls.minPolarAngle = 0;
+    controls.maxPolarAngle = Math.PI * 0.5;
+    controls.minDistance = 0.1;
+    controls.maxDistance = 250;
+  }
 }
 
 function smootherStep(value) {
@@ -453,7 +474,7 @@ function updateCameraTransition() {
   const progress = Math.min(elapsed / duration, 1);
   const eased = smootherStep(progress);
 
-  if ((cameraTransition.mode === 'map-enter' || cameraTransition.mode === 'intro-enter') && cameraTransition.path) {
+  if ((cameraTransition.mode === 'map-enter' || cameraTransition.mode === 'intro-enter' || cameraTransition.mode === 'map-exit') && cameraTransition.path) {
     camera.position.copy(cameraTransition.path.positionCurve.getPoint(eased));
     controls.target.copy(cameraTransition.path.targetCurve.getPoint(eased));
   } else {
@@ -469,10 +490,16 @@ function updateCameraTransition() {
 
     if (currentView === 'map') {
       controls.enableRotate = false;
-      controls.maxPolarAngle = 0.02;
+      controls.maxPolarAngle = 0.08;
       controls.minPolarAngle = 0;
-      controls.minDistance = 16;
-      controls.maxDistance = 34;
+      controls.minDistance = MAP_MIN_DISTANCE;
+      controls.maxDistance = MAP_MAX_DISTANCE;
+    } else if (currentFocusHouse) {
+      controls.enableRotate = true;
+      controls.maxPolarAngle = Math.PI * 0.48;
+      controls.minPolarAngle = 0;
+      controls.minDistance = 1.5;
+      controls.maxDistance = 28;
     } else {
       controls.enableRotate = !introActive;
       controls.maxPolarAngle = Math.PI * 0.48;
@@ -509,6 +536,7 @@ function triggerHouseFocus(house) {
 
 function syncUiState() {
   ui.mapToggle?.classList.toggle('is-active', currentView === 'map');
+  ui.compass?.classList.toggle('is-visible', currentView === 'map');
   if (currentView !== 'village') {
     interaction.hideHoverOverlays();
     interaction.resetHoverState();
@@ -552,6 +580,11 @@ function updateViewTransition() {
   renderFogColor.copy(timeOfDayState.fog).lerp(fogColors.map, viewTransition.progress * 0.42);
   scene.background.lerp(renderSkyColor, 0.045);
   scene.fog.color.lerp(renderFogColor, 0.045);
+
+  const targetFogNear = THREE.MathUtils.lerp(FOG_NEAR, MAP_FOG_NEAR, viewTransition.progress);
+  const targetFogFar = THREE.MathUtils.lerp(FOG_FAR, MAP_FOG_FAR, viewTransition.progress);
+  scene.fog.near += (targetFogNear - scene.fog.near) * 0.045;
+  scene.fog.far += (targetFogFar - scene.fog.far) * 0.045;
 
   if (ground) {
     renderGroundColor.copy(timeOfDayState.ground).lerp(mapGroundColor, viewTransition.progress * 0.45);
