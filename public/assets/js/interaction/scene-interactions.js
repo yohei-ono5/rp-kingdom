@@ -7,6 +7,7 @@ export function createSceneInteractionController({
   villageGroup,
   landPlotGroup,
   landPlotTargets,
+  videoBillboardTargets = [],
   ui,
   dragThreshold,
   getRenderPixelRatio,
@@ -19,6 +20,7 @@ export function createSceneInteractionController({
   onToggleMap,
   onResetView,
   onFocusHouse,
+  onClickVideoBillboard,
   onCameraManualChange,
   onToggleNavMenu,
   onCloseNavMenu
@@ -81,10 +83,17 @@ export function createSceneInteractionController({
       button.addEventListener('click', () => {
         const id = button.dataset.view;
         const house = villageGroup.children.find((item) => item.userData.id === id);
+        if (house) {
+          onFocusHouse(house);
+          onCloseNavMenu?.();
+          return;
+        }
 
-        if (!house) return;
-        onFocusHouse(house);
-        onCloseNavMenu?.();
+        const billboard = videoBillboardTargets.find((item) => item.userData.id === id);
+        if (billboard) {
+          onClickVideoBillboard?.(billboard);
+          onCloseNavMenu?.();
+        }
       });
     });
   }
@@ -172,9 +181,11 @@ export function createSceneInteractionController({
     const hoveredTarget = getHoveredTarget(event);
     const hoveredHouse = hoveredTarget?.type === 'house' ? hoveredTarget.object : null;
     const hoveredPlot = hoveredTarget?.type === 'plot' ? hoveredTarget.object : null;
+    const hoveredBillboard = hoveredTarget?.type === 'billboard' ? hoveredTarget.object : null;
     const showHoverState = hoveredHouse && getCurrentView() === 'village';
     const showPlotState = hoveredPlot && getCurrentView() === 'village';
-    document.body.style.cursor = showHoverState || showPlotState ? 'pointer' : 'default';
+    const showBillboardState = hoveredBillboard && getCurrentView() === 'village';
+    document.body.style.cursor = showHoverState || showPlotState || showBillboardState ? 'pointer' : 'default';
 
     villageGroup.children.forEach((house) => {
       const isHovered = hoveredHouse === house && getCurrentView() === 'village';
@@ -229,6 +240,14 @@ export function createSceneInteractionController({
     if (isTouch && selectedPlot) {
       selectedPlot = null;
       hidePlotPanel();
+    }
+
+    if (clickedTarget?.type === 'billboard') {
+      selectedPlot = null;
+      hidePlotPanel();
+      hideHouseTooltip();
+      onClickVideoBillboard?.(clickedTarget.object);
+      return;
     }
 
     const clickedHouse = clickedTarget?.type === 'house' ? clickedTarget.object : null;
@@ -296,14 +315,20 @@ export function createSceneInteractionController({
     raycaster.setFromCamera(mouse, camera);
 
     const intersects = raycaster.intersectObjects(
-      [...villageGroup.children, ...landPlotTargets],
+      [...villageGroup.children, ...landPlotTargets, ...videoBillboardTargets],
       true
     );
     if (intersects.length === 0) return null;
 
     for (const intersect of intersects) {
       let object = intersect.object;
-      while (object && !object.userData.isHouse && !object.userData.parentPlot && object.parent) {
+      while (
+        object
+        && !object.userData.isHouse
+        && !object.userData.parentPlot
+        && !object.userData.isVideoBillboard
+        && object.parent
+      ) {
         object = object.parent;
       }
 
@@ -313,6 +338,10 @@ export function createSceneInteractionController({
 
       if (object?.userData?.parentPlot?.userData?.isLandPlot) {
         return { type: 'plot', object: object.userData.parentPlot };
+      }
+
+      if (object?.userData?.isVideoBillboard) {
+        return { type: 'billboard', object };
       }
     }
 
