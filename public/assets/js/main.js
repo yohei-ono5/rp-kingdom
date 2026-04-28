@@ -3,7 +3,8 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import {
   FRONT_HOUSE_DESTINATION,
   HOUSE_DESTINATIONS,
-  LAND_PLOTS
+  LAND_PLOTS,
+  VIDEO_BILLBOARDS
 } from './site-config.js';
 import {
   applyFocusCamera as applyDoorFocusCamera,
@@ -16,6 +17,7 @@ import {
 } from './camera/transition-paths.js';
 import { loadWorldObjects, renderDestinationButtons } from './scene/world-objects.js';
 import { initLandPlots, updateLandPlots } from './scene/land-plots.js';
+import { initVideoBillboards } from './scene/video-billboards.js';
 import { createSkyObjects } from './scene/sky-objects.js';
 import { createSceneInteractionController } from './interaction/scene-interactions.js';
 import { createTimeOfDayController } from './systems/time-of-day.js';
@@ -85,13 +87,15 @@ const villageGroup = new THREE.Group();
 const mapOverlayGroup = new THREE.Group();
 const sceneryGroup = new THREE.Group();
 const landPlotGroup = new THREE.Group();
+const videoBillboardGroup = new THREE.Group();
 scene.add(villageGroup);
 scene.add(mapOverlayGroup);
 scene.add(sceneryGroup);
 scene.add(landPlotGroup);
+scene.add(videoBillboardGroup);
 
 renderDestinationButtons(
-  [FRONT_HOUSE_DESTINATION, ...HOUSE_DESTINATIONS],
+  [FRONT_HOUSE_DESTINATION, ...HOUSE_DESTINATIONS, ...VIDEO_BILLBOARDS],
   document.getElementById('view-nav')
 );
 
@@ -129,6 +133,7 @@ const houseLights = [];
 const mapMarkerMeta = [];
 const landPlotTargets = [];
 const landPlotMeta = [];
+const videoBillboardTargets = [];
 
 const ui = {
   introOverlay: document.getElementById('intro-overlay'),
@@ -160,8 +165,10 @@ let fillLight = null;
 
 let currentView = 'intro';
 let currentFocusHouse = null;
+let currentFocusBillboard = null;
 let popupDelayTimer = 0;
 let introActive = true;
+const BILLBOARD_FOCUS_DISTANCE = 5.5;
 
 let focusRequest = null;
 
@@ -211,7 +218,13 @@ const popup = createLinkPopup({
       window.open(url, '_blank', 'noopener,noreferrer');
     }
   },
-  getAnchorWorld: (house) => getHouseDoorAnchorWorld(house, DOOR_POPUP_HEIGHT),
+  getAnchorWorld: (subject) => {
+    if (subject?.userData?.isVideoBillboard) {
+      const liftHeight = (subject.userData.height || 2.25) / 2 + 0.5;
+      return subject.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0, liftHeight, 0));
+    }
+    return getHouseDoorAnchorWorld(subject, DOOR_POPUP_HEIGHT);
+  },
   projectWorldToScreen: (worldPosition) => worldToScreen(worldPosition, camera)
 });
 const interaction = createSceneInteractionController({
@@ -223,6 +236,7 @@ const interaction = createSceneInteractionController({
   villageGroup,
   landPlotGroup,
   landPlotTargets,
+  videoBillboardTargets,
   ui,
   dragThreshold: DRAG_THRESHOLD,
   getRenderPixelRatio,
@@ -235,6 +249,7 @@ const interaction = createSceneInteractionController({
   onToggleMap: () => setView(currentView === 'map' ? 'village' : 'map', { preserveFocus: false }),
   onResetView: () => resetToVillageView(),
   onFocusHouse: (house) => triggerHouseFocus(house),
+  onClickVideoBillboard: (billboard) => triggerVideoBillboardClick(billboard),
   onCameraManualChange: () => {
     desiredCameraPosition.copy(camera.position);
     desiredTarget.copy(controls.target);
@@ -268,6 +283,15 @@ initLandPlots({
   landPlotTargets,
   landPlotMeta
 });
+try {
+  initVideoBillboards({
+    billboards: VIDEO_BILLBOARDS,
+    parentGroup: videoBillboardGroup,
+    clickTargets: videoBillboardTargets
+  });
+} catch (error) {
+  console.error('Failed to initialize video billboards.', error);
+}
 void loadWorldObjects({
   objects: [...HOUSE_DESTINATIONS, FRONT_HOUSE_DESTINATION],
   villageGroup,
@@ -295,7 +319,8 @@ function startIntroExperience() {
 }
 
 function openLinkPopup(name, url) {
-  popup.openPopup(name, url, currentFocusHouse);
+  const subject = currentFocusBillboard || currentFocusHouse;
+  popup.openPopup(name, url, subject);
 }
 
 function closeLinkPopup() {
@@ -370,6 +395,7 @@ function setView(view, options = {}) {
 
   if (!options.preserveFocus) {
     currentFocusHouse = null;
+    currentFocusBillboard = null;
   }
 
   if (view !== 'village' || !options.preserveFocus) {
@@ -406,7 +432,14 @@ function applyViewState(options = {}) {
     controls.maxPolarAngle = Math.PI * 0.48;
     controls.minPolarAngle = 0;
     controls.minDistance = 1.5;
-    controls.maxDistance = 28;
+    controls.maxDistance = 80;
+  } else if (currentFocusBillboard && options.preserveFocus !== false) {
+    applyBillboardFocusCamera(currentFocusBillboard);
+    controls.enableRotate = true;
+    controls.maxPolarAngle = Math.PI * 0.48;
+    controls.minPolarAngle = 0;
+    controls.minDistance = 1.5;
+    controls.maxDistance = 80;
   } else {
     desiredCameraPosition.copy(cameraState.village.position);
     desiredTarget.copy(cameraState.village.target);
@@ -414,7 +447,7 @@ function applyViewState(options = {}) {
     controls.maxPolarAngle = Math.PI * 0.48;
     controls.minPolarAngle = 0;
     controls.minDistance = 8;
-    controls.maxDistance = 28;
+    controls.maxDistance = 80;
   }
 
   syncUiState();
@@ -427,6 +460,20 @@ function applyFocusCamera(house) {
     desiredTarget,
     options: FOCUS_CAMERA_OPTIONS
   });
+}
+
+function applyBillboardFocusCamera(billboard) {
+  const billboardWorldPos = billboard.getWorldPosition(new THREE.Vector3());
+  const rotY = billboard.rotation.y;
+  const normalX = Math.sin(rotY);
+  const normalZ = Math.cos(rotY);
+
+  desiredCameraPosition.set(
+    billboardWorldPos.x + normalX * BILLBOARD_FOCUS_DISTANCE,
+    billboardWorldPos.y,
+    billboardWorldPos.z + normalZ * BILLBOARD_FOCUS_DISTANCE
+  );
+  desiredTarget.copy(billboardWorldPos);
 }
 
 function startCameraTransition(mode) {
@@ -494,18 +541,18 @@ function updateCameraTransition() {
       controls.minPolarAngle = 0;
       controls.minDistance = MAP_MIN_DISTANCE;
       controls.maxDistance = MAP_MAX_DISTANCE;
-    } else if (currentFocusHouse) {
+    } else if (currentFocusHouse || currentFocusBillboard) {
       controls.enableRotate = true;
       controls.maxPolarAngle = Math.PI * 0.48;
       controls.minPolarAngle = 0;
       controls.minDistance = 1.5;
-      controls.maxDistance = 28;
+      controls.maxDistance = 80;
     } else {
       controls.enableRotate = !introActive;
       controls.maxPolarAngle = Math.PI * 0.48;
       controls.minPolarAngle = 0;
       controls.minDistance = 8;
-      controls.maxDistance = 28;
+      controls.maxDistance = 80;
     }
   }
 }
@@ -517,6 +564,7 @@ function resetToVillageView(options = {}) {
     closeLinkPopup();
   }
   currentFocusHouse = null;
+  currentFocusBillboard = null;
   focusRequest = null;
   setView('village', { preserveFocus: false, ...viewOptions });
 }
@@ -526,11 +574,27 @@ function triggerHouseFocus(house) {
   closeLinkPopup();
 
   currentFocusHouse = house;
+  currentFocusBillboard = null;
   setView('village', { preserveFocus: true });
 
   focusRequest = {
     name: house.userData.name,
     url: house.userData.url
+  };
+}
+
+function triggerVideoBillboardClick(billboard) {
+  if (!billboard?.userData?.url) return;
+  clearTimeout(popupDelayTimer);
+  closeLinkPopup();
+
+  currentFocusBillboard = billboard;
+  currentFocusHouse = null;
+  setView('village', { preserveFocus: true });
+
+  focusRequest = {
+    name: billboard.userData.name,
+    url: billboard.userData.url
   };
 }
 
@@ -543,7 +607,8 @@ function syncUiState() {
   }
 
   ui.viewButtons.forEach((button) => {
-    const isActive = currentFocusHouse?.userData?.id === button.dataset.view && currentView === 'village';
+    const focusedId = currentFocusHouse?.userData?.id || currentFocusBillboard?.userData?.id;
+    const isActive = focusedId === button.dataset.view && currentView === 'village';
     button.classList.toggle('is-active', isActive);
   });
 

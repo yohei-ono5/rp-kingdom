@@ -1,5 +1,6 @@
 const STANDARD_HOUSE_MODEL_URL = new URL('../models/Fantasy_House_6.glb', import.meta.url).href;
 const ARTIST_HOUSE_MODEL_URL = new URL('../models/Fantasy_House.glb', import.meta.url).href;
+const YOUTUBE_PROMO_VIDEO_URL = new URL('../videos/youtube-promo.mp4', import.meta.url).href;
 
 export const HOUSE_DESTINATIONS = [
   {
@@ -15,10 +16,10 @@ export const HOUSE_DESTINATIONS = [
     doorFacing: [0, 0, 1]
   },
   {
-    id: 'youtube',
-    label: 'YOUTUBE',
-    name: 'YouTube House',
-    url: 'https://www.youtube.com/@Rujie-official',
+    id: 'music',
+    label: 'MUSIC',
+    name: 'Music',
+    url: 'https://open.spotify.com/intl-ja/artist/72jZx00qFvEw8QOerhRuL5',
     modelUrl: STANDARD_HOUSE_MODEL_URL,
     position: [-11.5, 0, 6.8],
     scale: 0.68,
@@ -52,6 +53,20 @@ export const FRONT_HOUSE_DESTINATION = {
   doorOffset: [0.48, 0, 0.58],
   doorFacing: [0, 0, 1]
 };
+
+export const VIDEO_BILLBOARDS = [
+  {
+    id: 'youtube',
+    label: 'YOUTUBE',
+    name: 'Latest Video',
+    url: 'https://www.youtube.com/@Rujie-official',
+    videoUrl: YOUTUBE_PROMO_VIDEO_URL,
+    position: [-12.0, 3.0, 13.0],
+    rotationY: 0,
+    width: 4.0,
+    height: 2.25
+  }
+];
 
 export const LAND_PLOTS = [
   {
