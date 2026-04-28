@@ -93,6 +93,7 @@ function createVideoElement(src) {
   video.setAttribute('webkit-playsinline', '');
   video.autoplay = true;
   video.preload = 'auto';
+  video.crossOrigin = 'anonymous';
   video.style.display = 'none';
   video.src = src;
   document.body.appendChild(video);

@@ -23,7 +23,7 @@
 ### アセット
 - `public/assets/models/Fantasy_House_6.glb`: 通常の建物（COMPANY / MUSIC / SHOP）
 - `public/assets/models/Fantasy_House.glb`: 前面のアーティストハウス（ARTIST）
-- `public/assets/videos/youtube-promo.mp4`: YOUTUBE 看板で再生する mp4 サンプル動画
+- `public/assets/videos/`: 動画看板用 mp4 のローカル置き場（`.gitignore` で除外、本番は Cloudflare R2 から配信）
 - `resources/models/tree_LOD0.glb`: 未使用アセット
 
 ## 現状の仕様
@@ -74,7 +74,9 @@
 - リンク、建物ラベル、建物配置、ドア位置、売地/広告枠区画、動画看板（位置・サイズ・回転・動画 URL・遷移先 URL）の変更は `public/assets/js/site-config.js` を編集
 - 新しい建物モデルを追加する場合は `modelUrl` と `doorOffset` / `doorFacing` をセットで定義（フォーカスカメラとポップアップ位置に直結）
 - 新しい動画看板を追加する場合は `VIDEO_BILLBOARDS` に項目追加（`position` / `rotationY` / `width` / `height` / `videoUrl` / `url` / `label`）。`label` を入れるとナビボタンも自動生成される
-- 動画ファイルは `public/assets/videos/` 配下に配置。mp4 (H.264 + AAC) を推奨。サンプル動画の差し替えは `site-config.js` の `YOUTUBE_PROMO_VIDEO_URL` を変更
+- 動画ファイルは Cloudflare R2 にホスト（egress 無料）し、`site-config.js` の URL 定数（`YOUTUBE_PROMO_VIDEO_URL` 等）を R2 の `https://pub-xxxx.r2.dev/<file>.mp4` に差し替え。ローカル開発用に `public/assets/videos/` に同名 mp4 を置いてもよい（`.gitignore` で除外済み）
+- R2 の CORS ポリシーは `AllowedOrigins: ["*"]` / `AllowedMethods: ["GET", "HEAD"]` を許可（`THREE.VideoTexture` で WebGL テクスチャ化するため必須）
+- 動画要素は `crossOrigin = 'anonymous'` 必須（R2 など外部 CDN から WebGL に流すため）
 - イントロの見た目調整は `public/index.html` の `#intro-overlay` 周辺
 - 時計の表示・配置は `public/index.html` の `#tod-widget` と `.nav-left` 周辺
 - コンパスの見た目・位置は `public/index.html` の `#compass-widget` 周辺、表示制御は `public/assets/js/main.js` の `syncUiState`

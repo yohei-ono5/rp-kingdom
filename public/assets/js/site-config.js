@@ -1,6 +1,6 @@
 const STANDARD_HOUSE_MODEL_URL = new URL('../models/Fantasy_House_6.glb', import.meta.url).href;
 const ARTIST_HOUSE_MODEL_URL = new URL('../models/Fantasy_House.glb', import.meta.url).href;
-const YOUTUBE_PROMO_VIDEO_URL = new URL('../videos/youtube-promo.mp4', import.meta.url).href;
+const YOUTUBE_PROMO_VIDEO_URL = 'https://pub-8c47d9817fce4e86a82d02fad188f8e8.r2.dev/youtube-promo.mp4';
 
 export const HOUSE_DESTINATIONS = [
   {
