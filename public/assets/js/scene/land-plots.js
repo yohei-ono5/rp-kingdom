@@ -4,7 +4,8 @@ export function initLandPlots({
   plots,
   landPlotGroup,
   landPlotTargets,
-  landPlotMeta
+  landPlotMeta,
+  getPlotText = () => ({})
 }) {
   plots.forEach((plot) => {
     const width = plot.width || 4.5;
@@ -15,6 +16,7 @@ export function initLandPlots({
     group.rotation.y = plot.rotationY || 0;
     group.userData = {
       ...plot,
+      ...getPlotText(plot),
       isLandPlot: true,
       baseY: plot.position?.[1] || 0,
       targetHoverScale: 1,
@@ -75,7 +77,7 @@ export function initLandPlots({
     const sign = new THREE.Mesh(
       new THREE.PlaneGeometry(1.75, 1.75),
       new THREE.MeshBasicMaterial({
-        map: makeForSaleTexture(plot),
+        map: makeForSaleTexture(group.userData),
         side: THREE.DoubleSide
       })
     );
@@ -89,8 +91,24 @@ export function initLandPlots({
       group,
       floorMaterial,
       borderMaterial: border.material,
+      signMaterial: sign.material,
       homeY: group.position.y
     });
+  });
+}
+
+export function updateLandPlotLanguage({
+  landPlotMeta,
+  getPlotText = () => ({})
+}) {
+  landPlotMeta.forEach((meta) => {
+    Object.assign(meta.group.userData, getPlotText(meta.group.userData));
+
+    if (!meta.signMaterial) return;
+    const previousTexture = meta.signMaterial.map;
+    meta.signMaterial.map = makeForSaleTexture(meta.group.userData);
+    meta.signMaterial.needsUpdate = true;
+    previousTexture?.dispose?.();
   });
 }
 
@@ -151,7 +169,7 @@ function makeForSaleTexture(plot) {
 
   context.fillStyle = '#6f3810';
   context.font = '32px Georgia, serif';
-  context.fillText(`Plot ${plot.id}`, canvas.width / 2, 266);
+  context.fillText(`${plot.plotPrefix || 'Plot'} ${plot.id}`, canvas.width / 2, 266);
 
   context.fillStyle = '#b83218';
   context.font = 'bold 34px sans-serif';
@@ -163,7 +181,7 @@ function makeForSaleTexture(plot) {
 
   context.fillStyle = 'rgba(75, 43, 11, 0.72)';
   context.font = '22px sans-serif';
-  context.fillText('inquiries welcome', canvas.width / 2, 438);
+  context.fillText(plot.inquiry || 'inquiries welcome', canvas.width / 2, 438);
 
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;

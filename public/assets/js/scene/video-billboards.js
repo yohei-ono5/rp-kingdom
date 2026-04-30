@@ -71,7 +71,6 @@ function createBillboard(data) {
 
   wrapper.userData = {
     id: data.id,
-    name: data.name,
     url: data.url,
     isVideoBillboard: true,
     width,

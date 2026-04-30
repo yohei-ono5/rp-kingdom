@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DEFAULT_DOOR_FACING, DEFAULT_DOOR_OFFSET } from '../camera/focus-camera.js';
 
-export function renderDestinationButtons(destinations, viewNav) {
+export function renderDestinationButtons(destinations, viewNav, { getLabel } = {}) {
   if (!viewNav) return;
 
   viewNav.replaceChildren(
@@ -11,7 +11,7 @@ export function renderDestinationButtons(destinations, viewNav) {
       button.className = 'nav-btn';
       button.type = 'button';
       button.dataset.view = item.id;
-      button.textContent = item.label;
+      button.textContent = getLabel?.(item) || item.id;
       return button;
     })
   );
@@ -73,8 +73,6 @@ function addWorldObject({
 
   wrapper.userData = {
     id: data.id,
-    label: data.label,
-    name: data.name,
     url: data.url,
     isHouse: true,
     baseScale: data.scale,
