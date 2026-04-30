@@ -289,8 +289,8 @@ export function createSceneInteractionController({
 
     const data = plot.userData;
     if (ui.plotPanelStatus) ui.plotPanelStatus.textContent = data.status || 'FOR SALE';
-    if (ui.plotPanelId) ui.plotPanelId.textContent = `Plot ${data.id}`;
-    if (ui.plotPanelTitle) ui.plotPanelTitle.textContent = data.title || '分譲地';
+    if (ui.plotPanelId) ui.plotPanelId.textContent = `${data.plotPrefix || 'Plot'} ${data.id}`;
+    if (ui.plotPanelTitle) ui.plotPanelTitle.textContent = data.title || data.plotFallbackTitle || '分譲地';
     if (ui.plotPanelPrice) ui.plotPanelPrice.textContent = data.price || '';
     if (ui.plotPanelSize) ui.plotPanelSize.textContent = data.size || '';
     if (ui.plotPanelDesc) ui.plotPanelDesc.textContent = data.description || '';

@@ -16,12 +16,13 @@ import {
   resolveCameraTransitionMode
 } from './camera/transition-paths.js';
 import { loadWorldObjects, renderDestinationButtons } from './scene/world-objects.js';
-import { initLandPlots, updateLandPlots } from './scene/land-plots.js';
+import { initLandPlots, updateLandPlotLanguage, updateLandPlots } from './scene/land-plots.js';
 import { initVideoBillboards } from './scene/video-billboards.js';
 import { createSkyObjects } from './scene/sky-objects.js';
 import { createSceneInteractionController } from './interaction/scene-interactions.js';
 import { createTimeOfDayController } from './systems/time-of-day.js';
 import { createLinkPopup } from './ui/link-popup.js';
+import { createI18nController } from './i18n.js';
 
 const VIEW_BLEND_SPEED = 0.08;
 const CAMERA_BLEND_SPEED = 0.07;
@@ -48,6 +49,10 @@ const FOCUS_CAMERA_OPTIONS = Object.freeze({
   targetHeight: 1.15
 });
 const fixedHour = resolveFixedHour();
+const destinations = [FRONT_HOUSE_DESTINATION, ...HOUSE_DESTINATIONS, ...VIDEO_BILLBOARDS];
+const i18n = createI18nController({
+  onChange: () => applyLanguage()
+});
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x1a1a2e);
@@ -94,10 +99,9 @@ scene.add(sceneryGroup);
 scene.add(landPlotGroup);
 scene.add(videoBillboardGroup);
 
-renderDestinationButtons(
-  [FRONT_HOUSE_DESTINATION, ...HOUSE_DESTINATIONS, ...VIDEO_BILLBOARDS],
-  document.getElementById('view-nav')
-);
+renderDestinationButtons(destinations, document.getElementById('view-nav'), {
+  getLabel: getDestinationLabel
+});
 
 const desiredCameraPosition = camera.position.clone();
 const desiredTarget = controls.target.clone();
@@ -131,6 +135,7 @@ const overlayMaterials = [];
 const houseMaterials = [];
 const houseLights = [];
 const mapMarkerMeta = [];
+const mapLabelMeta = [];
 const landPlotTargets = [];
 const landPlotMeta = [];
 const videoBillboardTargets = [];
@@ -140,6 +145,9 @@ const ui = {
   introEnter: document.getElementById('intro-enter'),
   resetView: document.getElementById('reset-view'),
   mapToggle: document.getElementById('map-toggle'),
+  languageMenu: document.getElementById('language-menu'),
+  languageToggle: document.getElementById('language-toggle'),
+  languageOptions: document.getElementById('language-options'),
   topNav: document.getElementById('top-nav'),
   navMenuToggle: document.getElementById('nav-menu-toggle'),
   viewButtons: Array.from(document.querySelectorAll('.nav-btn[data-view]')),
@@ -149,6 +157,7 @@ const ui = {
   houseTooltipName: document.querySelector('.house-tooltip-name'),
   todClock: document.getElementById('tod-clock'),
   compass: document.getElementById('compass-widget'),
+  mapLabelLayer: document.getElementById('map-label-layer'),
   plotPanel: document.getElementById('plot-panel'),
   plotPanelStatus: document.querySelector('.plot-panel-status'),
   plotPanelId: document.querySelector('.plot-panel-id'),
@@ -204,7 +213,11 @@ const cameraState = {
 
 const timeOfDay = createTimeOfDayController({
   clockElement: ui.todClock,
-  fixedHour
+  fixedHour,
+  getLocale: () => i18n.locale,
+  getLanguage: () => i18n.language,
+  getLanguageTimeZone: () => i18n.timeZone,
+  getText: (key, fallback) => i18n.t(key, fallback)
 });
 const timeOfDayState = timeOfDay.state;
 const skyObjects = createSkyObjects(scene);
@@ -225,7 +238,8 @@ const popup = createLinkPopup({
     }
     return getHouseDoorAnchorWorld(subject, DOOR_POPUP_HEIGHT);
   },
-  projectWorldToScreen: (worldPosition) => worldToScreen(worldPosition, camera)
+  projectWorldToScreen: (worldPosition) => worldToScreen(worldPosition, camera),
+  getText: (key, fallback) => i18n.t(key, fallback)
 });
 const interaction = createSceneInteractionController({
   camera,
@@ -258,6 +272,217 @@ const interaction = createSceneInteractionController({
   onCloseNavMenu: () => closeNavMenu()
 });
 
+buildLanguageMenu();
+
+function getDestinationLabel(destination) {
+  return i18n.t(`destinations.${destination.id}.label`, formatDestinationFallback(destination.id));
+}
+
+function getDestinationName(destination) {
+  return i18n.t(`destinations.${destination.id}.name`, getDestinationLabel(destination));
+}
+
+function formatDestinationFallback(id) {
+  if (!id) return '';
+  return id
+    .split(/[-_\s]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
+function getPlotText(plot) {
+  const basePath = `plots.${plot.id}`;
+  return {
+    title: i18n.t(`${basePath}.title`, i18n.t('plotFallbackTitle', 'Available Plot')),
+    status: i18n.t(`${basePath}.status`, 'FOR SALE'),
+    price: i18n.t(`${basePath}.price`, i18n.t('plotFallbackPrice', 'Contact us')),
+    description: i18n.t(`${basePath}.description`, ''),
+    plotPrefix: i18n.t('plotPrefix', 'Plot'),
+    inquiry: i18n.t('plotInquiry', 'inquiries welcome')
+  };
+}
+
+function buildLanguageMenu() {
+  if (!ui.languageOptions) return;
+
+  ui.languageOptions.replaceChildren(
+    ...i18n.languages.map((language) => {
+      const option = document.createElement('button');
+      option.className = 'language-option';
+      option.type = 'button';
+      option.role = 'menuitemradio';
+      option.dataset.language = language.code;
+      option.textContent = language.label;
+      return option;
+    })
+  );
+}
+
+function bindLanguageEvents() {
+  ui.languageToggle?.addEventListener('click', (event) => {
+    event.stopPropagation();
+    const open = !ui.languageMenu?.classList.contains('is-open');
+    setLanguageMenuOpen(open);
+  });
+
+  ui.languageOptions?.addEventListener('click', (event) => {
+    const option = event.target.closest('.language-option');
+    if (!option) return;
+    i18n.setLanguage(option.dataset.language);
+    setLanguageMenuOpen(false);
+    closeNavMenu();
+  });
+
+  document.addEventListener('click', (event) => {
+    if (!ui.languageMenu || ui.languageMenu.contains(event.target)) {
+      return;
+    }
+    setLanguageMenuOpen(false);
+  });
+}
+
+function setLanguageMenuOpen(open) {
+  ui.languageMenu?.classList.toggle('is-open', open);
+  ui.languageToggle?.setAttribute('aria-expanded', open ? 'true' : 'false');
+}
+
+function applyLanguage() {
+  ui.resetView.textContent = i18n.t('resetView', 'HOME');
+  ui.mapToggle.textContent = i18n.t('map', 'MAP');
+  ui.navMenuToggle?.setAttribute('aria-label', i18n.t('menu', 'メニュー'));
+  ui.introEnter.textContent = 'Enter';
+  document.querySelector('.intro-hint').textContent = i18n.t('introHint', 'Press Enter');
+
+  updateLanguageMenuState();
+  updateDestinationButtonLabels();
+  updateWorldObjectTranslations();
+  updateBillboardTranslations();
+  updateMapLabelTexts();
+  updateLandPlotTranslations();
+  popup.updateTexts();
+  timeOfDay.update(true);
+  syncUiState();
+}
+
+function updateLanguageMenuState() {
+  if (ui.languageToggle) {
+    ui.languageToggle.textContent = `${i18n.t('language', 'Language')}: ${i18n.currentLabel}`;
+  }
+
+  ui.languageOptions?.querySelectorAll('.language-option').forEach((option) => {
+    const active = option.dataset.language === i18n.language;
+    option.classList.toggle('is-active', active);
+    option.setAttribute('aria-checked', active ? 'true' : 'false');
+  });
+}
+
+function updateDestinationButtonLabels() {
+  ui.viewButtons.forEach((button) => {
+    const destination = destinations.find((item) => item.id === button.dataset.view);
+    if (destination) {
+      button.textContent = getDestinationLabel(destination);
+    }
+  });
+}
+
+function rebuildMapLabels() {
+  if (!ui.mapLabelLayer) return;
+
+  mapLabelMeta.length = 0;
+  ui.mapLabelLayer.replaceChildren();
+
+  const subjects = [...villageGroup.children, ...videoBillboardTargets]
+    .filter((subject) => subject.userData?.id);
+
+  subjects.forEach((subject) => {
+    const element = document.createElement('div');
+    element.className = 'map-label';
+    element.tabIndex = 0;
+    element.role = 'button';
+
+    const title = document.createElement('span');
+    title.className = 'map-label-title';
+    const name = document.createElement('span');
+    name.className = 'map-label-name';
+
+    element.append(title, name);
+    ui.mapLabelLayer.appendChild(element);
+
+    element.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      focusMapLabelSubject(subject);
+    });
+
+    element.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      event.preventDefault();
+      event.stopPropagation();
+      focusMapLabelSubject(subject);
+    });
+
+    mapLabelMeta.push({
+      subject,
+      element,
+      title,
+      name
+    });
+  });
+
+  updateMapLabelTexts();
+}
+
+function updateMapLabelTexts() {
+  mapLabelMeta.forEach((meta) => {
+    const destination = destinations.find((item) => item.id === meta.subject.userData.id);
+    const label = destination ? getDestinationLabel(destination) : formatDestinationFallback(meta.subject.userData.id);
+    const name = destination ? getDestinationName(destination) : label;
+    const showName = name && name.toLocaleLowerCase() !== label.toLocaleLowerCase();
+
+    meta.title.textContent = label;
+    meta.name.textContent = showName ? name : '';
+    meta.name.hidden = !showName;
+    meta.element.setAttribute('aria-label', showName ? `${label} ${name}` : label);
+  });
+}
+
+function focusMapLabelSubject(subject) {
+  if (!subject) return;
+
+  if (subject.userData?.isVideoBillboard) {
+    triggerVideoBillboardClick(subject);
+  } else {
+    triggerHouseFocus(subject);
+  }
+
+  closeNavMenu();
+}
+
+function updateWorldObjectTranslations() {
+  villageGroup.children.forEach((house) => {
+    const destination = destinations.find((item) => item.id === house.userData.id);
+    if (!destination) return;
+    house.userData.label = getDestinationLabel(destination);
+    house.userData.name = getDestinationName(destination);
+  });
+}
+
+function updateBillboardTranslations() {
+  videoBillboardTargets.forEach((billboard) => {
+    const destination = destinations.find((item) => item.id === billboard.userData.id);
+    if (!destination) return;
+    billboard.userData.name = getDestinationName(destination);
+  });
+}
+
+function updateLandPlotTranslations() {
+  updateLandPlotLanguage({
+    landPlotMeta,
+    getPlotText
+  });
+}
+
 function toggleNavMenu() {
   if (!ui.topNav) return;
   const open = !ui.topNav.classList.contains('is-nav-open');
@@ -270,6 +495,7 @@ function closeNavMenu() {
   if (!ui.topNav.classList.contains('is-nav-open')) return;
   ui.topNav.classList.remove('is-nav-open');
   ui.navMenuToggle?.setAttribute('aria-expanded', 'false');
+  setLanguageMenuOpen(false);
 }
 
 document.body.classList.add('intro-active');
@@ -281,7 +507,8 @@ initLandPlots({
   plots: LAND_PLOTS,
   landPlotGroup,
   landPlotTargets,
-  landPlotMeta
+  landPlotMeta,
+  getPlotText
 });
 try {
   initVideoBillboards({
@@ -292,6 +519,7 @@ try {
 } catch (error) {
   console.error('Failed to initialize video billboards.', error);
 }
+rebuildMapLabels();
 void loadWorldObjects({
   objects: [...HOUSE_DESTINATIONS, FRONT_HOUSE_DESTINATION],
   villageGroup,
@@ -300,8 +528,13 @@ void loadWorldObjects({
   mapMarkerMeta,
   houseMaterials,
   houseLights
+}).then(() => {
+  updateWorldObjectTranslations();
+  rebuildMapLabels();
 });
 interaction.bindEvents();
+bindLanguageEvents();
+applyLanguage();
 timeOfDay.update(true);
 applyViewState({ preserveFocus: true });
 animate();
@@ -615,10 +848,10 @@ function syncUiState() {
   if (ui.hudNote) {
     ui.hudNote.classList.toggle('is-map', currentView === 'map');
     ui.hudNote.textContent = introActive
-      ? 'Enter the clouds to begin.'
+      ? i18n.t('hudIntro', 'Enter the clouds to begin.')
       : currentView === 'map'
-        ? 'MAP view: top-down overview.'
-        : 'Drag to orbit. Click a house to zoom, then confirm.';
+        ? i18n.t('hudMap', 'MAP view: top-down overview.')
+        : i18n.t('hudVillage', 'Drag to orbit. Click a house to zoom, then confirm.');
   }
 }
 
@@ -739,6 +972,49 @@ function updatePopupAnchor() {
   }
 }
 
+function updateMapLabels() {
+  if (!ui.mapLabelLayer) return;
+
+  const visible = viewTransition.progress > 0.18;
+  ui.mapLabelLayer.classList.toggle('is-visible', visible);
+  ui.mapLabelLayer.setAttribute('aria-hidden', visible ? 'false' : 'true');
+
+  mapLabelMeta.forEach((meta) => {
+    if (!visible) {
+      meta.element.style.opacity = '0';
+      meta.element.style.pointerEvents = 'none';
+      return;
+    }
+
+    const anchorWorld = getMapLabelAnchorWorld(meta.subject);
+    const screenPoint = worldToScreen(anchorWorld, camera);
+    const labelOpacity = THREE.MathUtils.smoothstep(viewTransition.progress, 0.18, 0.72);
+
+    if (!screenPoint.visible) {
+      meta.element.style.opacity = '0';
+      meta.element.style.pointerEvents = 'none';
+      return;
+    }
+
+    meta.element.style.opacity = String(labelOpacity);
+    meta.element.style.pointerEvents = labelOpacity > 0.35 ? 'auto' : 'none';
+    meta.element.style.left = `${screenPoint.x}px`;
+    meta.element.style.top = `${screenPoint.y - 12}px`;
+  });
+}
+
+function getMapLabelAnchorWorld(subject) {
+  const anchor = subject.getWorldPosition(new THREE.Vector3());
+
+  if (subject.userData?.isVideoBillboard) {
+    anchor.y += (subject.userData.height || 2.25) / 2 + 1.0;
+    return anchor;
+  }
+
+  anchor.y += 3.0;
+  return anchor;
+}
+
 function updateHouseScales() {
   villageGroup.children.forEach((house) => {
     const baseScale = house.userData.baseScale || 0.7;
@@ -780,5 +1056,6 @@ function animate() {
 
   controls.update();
   updatePopupAnchor();
+  updateMapLabels();
   renderer.render(scene, camera);
 }

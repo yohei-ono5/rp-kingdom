@@ -6,7 +6,11 @@ export function createTimeOfDayController({
   clockElement,
   labelElement,
   fixedHour = null,
-  clockUpdateInterval = DEFAULT_CLOCK_UPDATE_INTERVAL
+  clockUpdateInterval = DEFAULT_CLOCK_UPDATE_INTERVAL,
+  getLocale = () => 'ja-JP',
+  getLanguage = () => 'ja',
+  getLanguageTimeZone = () => 'Asia/Tokyo',
+  getText
 } = {}) {
   const state = {
     lastClockUpdate: 0,
@@ -27,11 +31,11 @@ export function createTimeOfDayController({
 
   const timeOfDayStops = [
     createTimeOfDayStop(0, 0x131738, 0x1c2240, 0x23563c, 0x8296d8, 0xa2b4ff, 0x8ea1ff, [-9, 4, -4], 0.58, 0.1, 1.12, 1.02),
-    createTimeOfDayStop(5, 0x394365, 0x4b526d, 0x285c37, 0xffc59a, 0xff9f5a, 0x788cff, [-7, 5, -3], 0.78, 0.95, 0.92, 1.06),
-    createTimeOfDayStop(8, 0x8fbfdc, 0xb4d8e8, 0x327341, 0xfff1dc, 0xffdfab, 0x8aa6ff, [7, 10, 5], 1.02, 1.75, 0.76, 1.16),
-    createTimeOfDayStop(12, 0x7fb8df, 0xa8d4e8, 0x347943, 0xfff2dd, 0xffe6c4, 0x8ba1ff, [8, 13, 6], 1.12, 2.15, 0.82, 1.22),
-    createTimeOfDayStop(16, 0x6fa8cf, 0x8fbfd2, 0x306f3f, 0xffe4c4, 0xffc277, 0x8598ff, [6, 8, 5], 0.98, 1.55, 0.9, 1.12),
-    createTimeOfDayStop(18, 0x49385b, 0x665064, 0x275c37, 0xffba88, 0xff8245, 0x7e78ff, [4, 4.8, 3], 0.72, 0.9, 1.05, 1.04),
+    createTimeOfDayStop(5, 0x394365, 0x4b526d, 0x285c37, 0xffc59a, 0xff9f5a, 0x788cff, [16, 5, 2], 0.78, 0.95, 0.92, 1.06),
+    createTimeOfDayStop(8, 0x8fbfdc, 0xb4d8e8, 0x327341, 0xfff1dc, 0xffdfab, 0x8aa6ff, [13, 8, 4], 1.02, 1.75, 0.76, 1.16),
+    createTimeOfDayStop(12, 0x7fb8df, 0xa8d4e8, 0x347943, 0xfff2dd, 0xffe6c4, 0x8ba1ff, [1, 14, 6], 1.12, 2.15, 0.82, 1.22),
+    createTimeOfDayStop(16, 0x6fa8cf, 0x8fbfd2, 0x306f3f, 0xffe4c4, 0xffc277, 0x8598ff, [-11, 8, 4], 0.98, 1.55, 0.9, 1.12),
+    createTimeOfDayStop(18, 0x49385b, 0x665064, 0x275c37, 0xffba88, 0xff8245, 0x7e78ff, [-16, 4.8, 2], 0.72, 0.9, 1.05, 1.04),
     createTimeOfDayStop(20, 0x1c2244, 0x262d4d, 0x265438, 0x93a4e0, 0xb0c0ff, 0x8ea1ff, [-7, 4.2, -4], 0.62, 0.18, 1.2, 1.0),
     createTimeOfDayStop(24, 0x131738, 0x1c2240, 0x23563c, 0x8296d8, 0xa2b4ff, 0x8ea1ff, [-9, 4, -4], 0.58, 0.1, 1.12, 1.02)
   ];
@@ -61,9 +65,13 @@ export function createTimeOfDayController({
       state.exposure = sampled.exposure;
 
       if (clockElement) {
-        clockElement.textContent = fixedHour === null
-          ? `日本時間 ${getJstClockText()}`
-          : `固定時間 ${formatFixedHour(fixedHour)}`;
+        clockElement.replaceChildren(...createClockLines({
+          fixedHour,
+          locale: getLocale(),
+          language: getLanguage(),
+          languageTimeZone: getLanguageTimeZone(),
+          getText
+        }));
       }
 
       if (labelElement) {
@@ -71,6 +79,40 @@ export function createTimeOfDayController({
       }
     }
   };
+}
+
+function createClockLines({
+  fixedHour,
+  locale,
+  language,
+  languageTimeZone,
+  getText
+}) {
+  const isJapanese = language === 'ja';
+  const resolveText = (key, fallback) => getText?.(key, fallback) || fallback;
+
+  if (fixedHour !== null) {
+    return [
+      createClockLine(`${resolveText('clockFixed', '固定時間')} ${formatFixedHour(fixedHour)}`)
+    ];
+  }
+
+  const lines = [
+    createClockLine(`${resolveText('clockJapan', '日本時間')} ${getJstClockText(locale)}`)
+  ];
+
+  if (!isJapanese) {
+    lines.push(createClockLine(`${languageTimeZone} ${getClockText(locale, languageTimeZone)}`));
+  }
+
+  return lines;
+}
+
+function createClockLine(text) {
+  const line = document.createElement('span');
+  line.className = 'tod-clock-line';
+  line.textContent = text;
+  return line;
 }
 
 function formatFixedHour(hour) {
@@ -135,12 +177,15 @@ function getJstHour() {
   return hour + minute / 60 + second / 3600;
 }
 
-function getJstClockText() {
-  return new Intl.DateTimeFormat('ja-JP', {
-    timeZone: 'Asia/Tokyo',
+function getJstClockText(locale = 'ja-JP') {
+  return getClockText(locale, 'Asia/Tokyo');
+}
+
+function getClockText(locale = 'ja-JP', timeZone = 'Asia/Tokyo') {
+  return new Intl.DateTimeFormat(locale, {
+    timeZone,
     hour: '2-digit',
     minute: '2-digit',
-    second: '2-digit',
     hour12: false
   }).format(new Date());
 }

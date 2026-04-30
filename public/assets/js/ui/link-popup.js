@@ -1,9 +1,12 @@
+import { DEFAULT_POPUP_TEXT } from '../i18n.js';
+
 export function createLinkPopup({
   onResetFocus,
   onNavigate,
   getAnchorWorld,
   projectWorldToScreen,
-  screenOffset = 22
+  screenOffset = 22,
+  getText
 }) {
   let pendingUrl = null;
   let popupAnchorHouse = null;
@@ -34,7 +37,6 @@ export function createLinkPopup({
   popupEl.appendChild(title);
 
   const desc = document.createElement('div');
-  desc.textContent = 'この建物のリンク先へ移動しますか？';
   desc.style.fontSize = '14px';
   desc.style.lineHeight = '1.5';
   desc.style.marginBottom = '14px';
@@ -46,7 +48,6 @@ export function createLinkPopup({
   actions.style.gap = '10px';
 
   const cancel = document.createElement('button');
-  cancel.textContent = 'キャンセル';
   cancel.type = 'button';
   cancel.style.padding = '10px 14px';
   cancel.style.borderRadius = '10px';
@@ -56,7 +57,6 @@ export function createLinkPopup({
   cancel.style.cursor = 'pointer';
 
   const go = document.createElement('button');
-  go.textContent = '移動する';
   go.type = 'button';
   go.style.padding = '10px 14px';
   go.style.borderRadius = '10px';
@@ -70,6 +70,16 @@ export function createLinkPopup({
   actions.appendChild(go);
   popupEl.appendChild(actions);
   document.body.appendChild(popupEl);
+
+  const resolveText = (key) => getText?.(key, DEFAULT_POPUP_TEXT[key]) || DEFAULT_POPUP_TEXT[key];
+
+  const updateTexts = () => {
+    desc.textContent = resolveText('popupQuestion');
+    cancel.textContent = resolveText('cancel');
+    go.textContent = resolveText('go');
+  };
+
+  updateTexts();
 
   const closePopup = ({ resetFocus = false } = {}) => {
     pendingUrl = null;
@@ -120,11 +130,12 @@ export function createLinkPopup({
     openPopup(name, url, house) {
       pendingUrl = url;
       popupAnchorHouse = house || null;
-      title.textContent = name || 'リンク先';
+      title.textContent = name || resolveText('fallbackLinkTitle');
       popupEl.style.display = 'block';
       updatePosition();
     },
     closePopup,
+    updateTexts,
     updatePosition,
     isOpen() {
       return popupEl.style.display !== 'none';
