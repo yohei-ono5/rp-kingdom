@@ -66,22 +66,44 @@ export function initLandPlots({
       group.add(post);
     });
 
+    const signZ = -depth * 0.28;
+    const signWidth = 1.75;
+    const signHeight = 1.75;
+    const signDepth = 0.12;
+
     const stake = new THREE.Mesh(
       new THREE.CylinderGeometry(0.055, 0.075, 1.55, 6),
       postMaterial
     );
-    stake.position.set(0, 0.78, -depth * 0.28);
+    stake.position.set(0, 0.78, signZ - signDepth * 0.68);
     stake.castShadow = true;
     group.add(stake);
 
-    const sign = new THREE.Mesh(
-      new THREE.PlaneGeometry(1.75, 1.75),
-      new THREE.MeshBasicMaterial({
-        map: makeForSaleTexture(group.userData),
-        side: THREE.DoubleSide
+    const signBoard = new THREE.Mesh(
+      new THREE.BoxGeometry(signWidth, signHeight, signDepth),
+      new THREE.MeshStandardMaterial({
+        color: 0xc48a42,
+        roughness: 0.74,
+        metalness: 0.0
       })
     );
-    sign.position.set(0, 1.72, -depth * 0.28);
+    signBoard.position.set(0, 1.72, signZ);
+    signBoard.castShadow = true;
+    signBoard.receiveShadow = true;
+    signBoard.userData = { isLandPlotTarget: true, parentPlot: group };
+    group.add(signBoard);
+    landPlotTargets.push(signBoard);
+
+    const sign = new THREE.Mesh(
+      new THREE.PlaneGeometry(signWidth, signHeight),
+      new THREE.MeshBasicMaterial({
+        map: makeForSaleTexture(group.userData),
+        side: THREE.FrontSide,
+        transparent: false,
+        depthWrite: true
+      })
+    );
+    sign.position.set(0, 1.72, signZ + signDepth / 2 + 0.004);
     sign.userData = { isLandPlotTarget: true, parentPlot: group };
     group.add(sign);
     landPlotTargets.push(sign);

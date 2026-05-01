@@ -206,7 +206,7 @@ export function createSceneInteractionController({
       if (!selectedPlot) hidePlotPanel();
     } else if (showPlotState) {
       hideHouseTooltip();
-      showPlotPanel(hoveredPlot);
+      showPlotPanel(hoveredPlot, event);
     } else {
       hideTransientHovers();
     }
@@ -231,7 +231,7 @@ export function createSceneInteractionController({
           hidePlotPanel();
         } else {
           selectedPlot = plot;
-          showPlotPanel(plot);
+          showPlotPanel(plot, event);
         }
       }
       return;
@@ -282,7 +282,7 @@ export function createSceneInteractionController({
     ui.houseTooltip?.classList.remove('is-visible');
   }
 
-  function showPlotPanel(plot) {
+  function showPlotPanel(plot, event) {
     if (!ui.plotPanel) {
       return;
     }
@@ -297,11 +297,38 @@ export function createSceneInteractionController({
 
     ui.plotPanel.classList.add('is-visible');
     ui.plotPanel.setAttribute('aria-hidden', 'false');
+    positionPlotPanel(event);
   }
 
   function hidePlotPanel() {
     ui.plotPanel?.classList.remove('is-visible');
     ui.plotPanel?.setAttribute('aria-hidden', 'true');
+  }
+
+  function positionPlotPanel(event) {
+    if (!ui.plotPanel || !event) {
+      return;
+    }
+
+    const margin = 12;
+    const gap = event.pointerType === 'touch' ? 18 : 16;
+    const rect = ui.plotPanel.getBoundingClientRect();
+    let left = event.clientX + gap;
+    let top = event.clientY + gap;
+
+    if (left + rect.width + margin > window.innerWidth) {
+      left = event.clientX - rect.width - gap;
+    }
+
+    if (top + rect.height + margin > window.innerHeight) {
+      top = event.clientY - rect.height - gap;
+    }
+
+    left = Math.max(margin, Math.min(left, window.innerWidth - rect.width - margin));
+    top = Math.max(margin, Math.min(top, window.innerHeight - rect.height - margin));
+
+    ui.plotPanel.style.left = `${left}px`;
+    ui.plotPanel.style.top = `${top}px`;
   }
 
   function updateMouseFromEvent(event) {

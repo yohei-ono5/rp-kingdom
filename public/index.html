@@ -86,12 +86,13 @@
     .nav-right {
       display: flex;
       gap: 10px;
-      align-items: flex-start;
+      align-items: stretch;
     }
 
     #view-nav {
       display: flex;
       gap: 10px;
+      align-items: stretch;
     }
 
     .nav-menu-toggle {
@@ -123,6 +124,11 @@
     }
 
     .nav-btn {
+      display: inline-flex;
+      min-height: 46px;
+      box-sizing: border-box;
+      align-items: center;
+      justify-content: center;
       background: rgba(20, 16, 40, 0.55);
       color: #f7eac0;
       border: 1px solid rgba(255, 220, 140, 0.25);
@@ -131,7 +137,9 @@
       cursor: pointer;
       font-family: Georgia, serif;
       font-size: 13px;
+      line-height: 1.15;
       letter-spacing: 0.06em;
+      text-align: center;
       backdrop-filter: blur(8px);
       transition:
         background 180ms ease,
@@ -475,11 +483,11 @@
 
     #plot-panel {
       position: fixed;
-      right: 24px;
-      bottom: 24px;
+      left: 0;
+      top: 0;
       z-index: 1600;
-      width: min(260px, calc(100vw - 48px));
-      padding: 16px 18px;
+      width: min(230px, calc(100vw - 24px));
+      padding: 14px 16px;
       border: 1px solid rgba(126, 76, 24, 0.34);
       border-radius: 12px;
       background: linear-gradient(135deg, rgba(255, 247, 218, 0.96), rgba(229, 204, 148, 0.96));
@@ -524,7 +532,7 @@
     .plot-panel-title {
       margin-bottom: 5px;
       color: #3d2309;
-      font-size: 17px;
+      font-size: 16px;
       font-weight: bold;
       letter-spacing: 0.04em;
     }
@@ -804,9 +812,12 @@
       }
 
       #plot-panel {
-        right: 18px;
-        bottom: 76px;
-        width: calc(100vw - 36px);
+        width: min(206px, calc(100vw - 24px));
+        padding: 12px 14px;
+      }
+
+      .plot-panel-title {
+        font-size: 15px;
       }
 
       #compass-widget {
