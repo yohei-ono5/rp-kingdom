@@ -4,6 +4,7 @@ import {
   FRONT_HOUSE_DESTINATION,
   HOUSE_DESTINATIONS,
   LAND_PLOTS,
+  TREE_SCATTER,
   VIDEO_BILLBOARDS
 } from './site-config.js';
 import {
@@ -17,6 +18,7 @@ import {
 } from './camera/transition-paths.js';
 import { loadWorldObjects, renderDestinationButtons } from './scene/world-objects.js';
 import { initLandPlots, updateLandPlotLanguage, updateLandPlots } from './scene/land-plots.js';
+import { createTreeExclusions, initTrees } from './scene/trees.js';
 import { initVideoBillboards } from './scene/video-billboards.js';
 import { createSkyObjects } from './scene/sky-objects.js';
 import { createSceneInteractionController } from './interaction/scene-interactions.js';
@@ -519,6 +521,18 @@ try {
 } catch (error) {
   console.error('Failed to initialize video billboards.', error);
 }
+void initTrees({
+  treeConfig: TREE_SCATTER,
+  parentGroup: sceneryGroup,
+  exclusions: createTreeExclusions({
+    houses: [...HOUSE_DESTINATIONS, FRONT_HOUSE_DESTINATION],
+    plots: LAND_PLOTS,
+    billboards: VIDEO_BILLBOARDS,
+    padding: TREE_SCATTER.exclusionPadding
+  })
+}).catch((error) => {
+  console.error('Failed to initialize trees.', error);
+});
 rebuildMapLabels();
 void loadWorldObjects({
   objects: [...HOUSE_DESTINATIONS, FRONT_HOUSE_DESTINATION],

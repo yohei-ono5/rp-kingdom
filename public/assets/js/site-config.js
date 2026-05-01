@@ -1,5 +1,6 @@
 const STANDARD_HOUSE_MODEL_URL = new URL('../models/Fantasy_House_6.glb', import.meta.url).href;
 const ARTIST_HOUSE_MODEL_URL = new URL('../models/Fantasy_House.glb', import.meta.url).href;
+const TREE_MODEL_URL = new URL('../models/tree_LOD0.glb', import.meta.url).href;
 const YOUTUBE_PROMO_VIDEO_URL = 'https://pub-8c47d9817fce4e86a82d02fad188f8e8.r2.dev/youtube-promo.mp4';
 
 export const HOUSE_DESTINATIONS = [
@@ -57,6 +58,22 @@ export const VIDEO_BILLBOARDS = [
     height: 2.25
   }
 ];
+
+export const TREE_SCATTER = {
+  modelUrl: TREE_MODEL_URL,
+  count: 38,
+  seed: 20260501,
+  bounds: {
+    minX: -31,
+    maxX: 29,
+    minZ: -31,
+    maxZ: -8
+  },
+  centerClearRadius: 14,
+  scaleRange: [0.55, 0.95],
+  minDistance: 2.15,
+  exclusionPadding: 1.7
+};
 
 export const LAND_PLOTS = [
   {
