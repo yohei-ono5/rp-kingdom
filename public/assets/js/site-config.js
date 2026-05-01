@@ -16,11 +16,32 @@ export const HOUSE_DESTINATIONS = [
   },
   {
     id: 'music',
-    url: 'https://open.spotify.com/intl-ja/artist/72jZx00qFvEw8QOerhRuL5',
+    links: [
+      {
+        id: 'spotify',
+        label: 'Spotify',
+        url: 'https://open.spotify.com/intl-ja/artist/72jZx00qFvEw8QOerhRuL5'
+      },
+      {
+        id: 'appleMusic',
+        label: 'Apple Music',
+        url: 'https://music.apple.com/jp/artist/rujie/1733652933'
+      }
+    ],
     modelUrl: STANDARD_HOUSE_MODEL_URL,
     position: [-11.5, 0, 6.8],
     scale: 0.68,
     rotationY: -0.28,
+    doorOffset: [0.08, 0, 0.92],
+    doorFacing: [0, 0, 1]
+  },
+  {
+    id: 'sns',
+    url: 'https://www.instagram.com/rujie.official/',
+    modelUrl: STANDARD_HOUSE_MODEL_URL,
+    position: [-17.2, 0, 6.0],
+    scale: 0.66,
+    rotationY: -0.18,
     doorOffset: [0.08, 0, 0.92],
     doorFacing: [0, 0, 1]
   },

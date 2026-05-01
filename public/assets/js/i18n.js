@@ -42,6 +42,7 @@ const translations = {
       artist: { label: 'Artist', name: 'Rujie Official Site' },
       company: { label: 'Company', name: 'The Crown Production' },
       music: { label: 'Music', name: 'Music' },
+      sns: { label: 'SNS', name: 'Instagram' },
       store: { label: 'Store', name: 'Rujie Official Store' },
       youtube: { label: 'Youtube', name: 'Youtube' }
     },
@@ -96,6 +97,7 @@ const translations = {
       artist: { label: 'Artist', name: 'Rujie Official Site' },
       company: { label: 'Company', name: 'The Crown Production' },
       music: { label: 'Music', name: 'Music' },
+      sns: { label: 'SNS', name: 'Instagram' },
       store: { label: 'Store', name: 'Rujie Official Store' },
       youtube: { label: 'Youtube', name: 'Youtube' }
     },
@@ -150,6 +152,7 @@ const translations = {
       artist: { label: 'Artist', name: 'Rujie Official Site' },
       company: { label: 'Company', name: 'The Crown Production' },
       music: { label: 'Music', name: 'Music' },
+      sns: { label: 'SNS', name: 'Instagram' },
       store: { label: 'Store', name: 'Rujie Official Store' },
       youtube: { label: 'Youtube', name: 'Youtube' }
     },
@@ -204,6 +207,7 @@ const translations = {
       artist: { label: 'Artist', name: 'Rujie Official Site' },
       company: { label: 'Company', name: 'The Crown Production' },
       music: { label: 'Music', name: 'Music' },
+      sns: { label: 'SNS', name: 'Instagram' },
       store: { label: 'Store', name: 'Rujie Official Store' },
       youtube: { label: 'Youtube', name: 'Youtube' }
     },
@@ -258,6 +262,7 @@ const translations = {
       artist: { label: 'Artist', name: 'Rujie Official Site' },
       company: { label: 'Company', name: 'The Crown Production' },
       music: { label: 'Music', name: 'Music' },
+      sns: { label: 'SNS', name: 'Instagram' },
       store: { label: 'Store', name: 'Rujie Official Store' },
       youtube: { label: 'Youtube', name: 'Youtube' }
     },

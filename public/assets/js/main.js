@@ -50,6 +50,11 @@ const FOCUS_CAMERA_OPTIONS = Object.freeze({
   targetInset: 0.28,
   targetHeight: 1.15
 });
+const PLOT_FOCUS_OPTIONS = Object.freeze({
+  cameraDistancePadding: 4.0,
+  cameraHeight: 3.2,
+  targetHeight: 0.4
+});
 const fixedHour = resolveFixedHour();
 const destinations = [FRONT_HOUSE_DESTINATION, ...HOUSE_DESTINATIONS, ...VIDEO_BILLBOARDS];
 const i18n = createI18nController({
@@ -177,6 +182,7 @@ let fillLight = null;
 let currentView = 'intro';
 let currentFocusHouse = null;
 let currentFocusBillboard = null;
+let currentFocusPlot = null;
 let popupDelayTimer = 0;
 let introActive = true;
 const BILLBOARD_FOCUS_DISTANCE = 5.5;
@@ -265,6 +271,7 @@ const interaction = createSceneInteractionController({
   onToggleMap: () => setView(currentView === 'map' ? 'village' : 'map', { preserveFocus: false }),
   onResetView: () => resetToVillageView(),
   onFocusHouse: (house) => triggerHouseFocus(house),
+  onFocusPlot: (plot) => triggerPlotFocus(plot),
   onClickVideoBillboard: (billboard) => triggerVideoBillboardClick(billboard),
   onCameraManualChange: () => {
     desiredCameraPosition.copy(camera.position);
@@ -565,9 +572,9 @@ function startIntroExperience() {
   resetToVillageView({ transitionMode: 'intro-enter' });
 }
 
-function openLinkPopup(name, url) {
+function openLinkPopup(name, destination) {
   const subject = currentFocusBillboard || currentFocusHouse;
-  popup.openPopup(name, url, subject);
+  popup.openPopup(name, destination, subject);
 }
 
 function closeLinkPopup() {
@@ -643,6 +650,7 @@ function setView(view, options = {}) {
   if (!options.preserveFocus) {
     currentFocusHouse = null;
     currentFocusBillboard = null;
+    currentFocusPlot = null;
   }
 
   if (view !== 'village' || !options.preserveFocus) {
@@ -682,6 +690,13 @@ function applyViewState(options = {}) {
     controls.maxDistance = 80;
   } else if (currentFocusBillboard && options.preserveFocus !== false) {
     applyBillboardFocusCamera(currentFocusBillboard);
+    controls.enableRotate = true;
+    controls.maxPolarAngle = Math.PI * 0.5;
+    controls.minPolarAngle = 0;
+    controls.minDistance = 1.5;
+    controls.maxDistance = 80;
+  } else if (currentFocusPlot && options.preserveFocus !== false) {
+    applyPlotFocusCamera(currentFocusPlot);
     controls.enableRotate = true;
     controls.maxPolarAngle = Math.PI * 0.48;
     controls.minPolarAngle = 0;
@@ -723,6 +738,21 @@ function applyBillboardFocusCamera(billboard) {
   desiredTarget.copy(billboardWorldPos);
 }
 
+function applyPlotFocusCamera(plot) {
+  const plotWorldPos = plot.getWorldPosition(new THREE.Vector3());
+  const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(plot.quaternion).setY(0).normalize();
+  const width = plot.userData.width || 4.5;
+  const depth = plot.userData.depth || 4.5;
+  const distance = Math.max(width, depth) * 0.72 + PLOT_FOCUS_OPTIONS.cameraDistancePadding;
+
+  desiredCameraPosition.copy(plotWorldPos)
+    .addScaledVector(forward, distance)
+    .add(new THREE.Vector3(0, PLOT_FOCUS_OPTIONS.cameraHeight, 0));
+
+  desiredTarget.copy(plotWorldPos)
+    .add(new THREE.Vector3(0, PLOT_FOCUS_OPTIONS.targetHeight, 0));
+}
+
 function startCameraTransition(mode) {
   cameraTransition.mode = mode;
   cameraTransition.startedAt = performance.now();
@@ -744,6 +774,7 @@ function startCameraTransition(mode) {
     || cameraTransition.fromTarget.distanceTo(cameraTransition.toTarget) > 0.01;
 
   if (cameraTransition.active) {
+    controls.enableDamping = false;
     controls.enableRotate = false;
     controls.minPolarAngle = 0;
     controls.maxPolarAngle = Math.PI * 0.5;
@@ -781,6 +812,10 @@ function updateCameraTransition() {
     cameraTransition.path = null;
     camera.position.copy(cameraTransition.toPosition);
     controls.target.copy(cameraTransition.toTarget);
+    desiredCameraPosition.copy(cameraTransition.toPosition);
+    desiredTarget.copy(cameraTransition.toTarget);
+    controls.update();
+    controls.enableDamping = true;
 
     if (currentView === 'map') {
       controls.enableRotate = false;
@@ -788,7 +823,13 @@ function updateCameraTransition() {
       controls.minPolarAngle = 0;
       controls.minDistance = MAP_MIN_DISTANCE;
       controls.maxDistance = MAP_MAX_DISTANCE;
-    } else if (currentFocusHouse || currentFocusBillboard) {
+    } else if (currentFocusBillboard) {
+      controls.enableRotate = true;
+      controls.maxPolarAngle = Math.PI * 0.5;
+      controls.minPolarAngle = 0;
+      controls.minDistance = 1.5;
+      controls.maxDistance = 80;
+    } else if (currentFocusHouse || currentFocusPlot) {
       controls.enableRotate = true;
       controls.maxPolarAngle = Math.PI * 0.48;
       controls.minPolarAngle = 0;
@@ -812,6 +853,7 @@ function resetToVillageView(options = {}) {
   }
   currentFocusHouse = null;
   currentFocusBillboard = null;
+  currentFocusPlot = null;
   focusRequest = null;
   setView('village', { preserveFocus: false, ...viewOptions });
 }
@@ -822,11 +864,14 @@ function triggerHouseFocus(house) {
 
   currentFocusHouse = house;
   currentFocusBillboard = null;
+  currentFocusPlot = null;
   setView('village', { preserveFocus: true });
 
   focusRequest = {
     name: house.userData.name,
-    url: house.userData.url
+    destination: house.userData.links?.length
+      ? house.userData.links
+      : house.userData.url
   };
 }
 
@@ -837,12 +882,24 @@ function triggerVideoBillboardClick(billboard) {
 
   currentFocusBillboard = billboard;
   currentFocusHouse = null;
+  currentFocusPlot = null;
   setView('village', { preserveFocus: true });
 
   focusRequest = {
     name: billboard.userData.name,
-    url: billboard.userData.url
+    destination: billboard.userData.url
   };
+}
+
+function triggerPlotFocus(plot) {
+  if (!plot) return;
+  clearTimeout(popupDelayTimer);
+  closeLinkPopup();
+
+  currentFocusPlot = plot;
+  currentFocusHouse = null;
+  currentFocusBillboard = null;
+  setView('village', { preserveFocus: true });
 }
 
 function syncUiState() {
@@ -876,11 +933,11 @@ function updateFocusPopup() {
     return;
   }
 
-  const { name, url } = focusRequest;
+  const { name, destination } = focusRequest;
   focusRequest = null;
 
   popupDelayTimer = window.setTimeout(() => {
-    openLinkPopup(name, url);
+    openLinkPopup(name, destination);
   }, 120);
 }
 

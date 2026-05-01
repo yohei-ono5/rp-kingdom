@@ -9,6 +9,7 @@ export function createLinkPopup({
   getText
 }) {
   let pendingUrl = null;
+  let pendingLinks = [];
   let popupAnchorHouse = null;
 
   const popupEl = document.createElement('div');
@@ -25,7 +26,7 @@ export function createLinkPopup({
   popupEl.style.boxShadow = '0 20px 60px rgba(0,0,0,0.45)';
   popupEl.style.zIndex = '1000';
   popupEl.style.minWidth = '240px';
-  popupEl.style.maxWidth = '280px';
+  popupEl.style.maxWidth = '520px';
   popupEl.style.fontFamily = 'Georgia, serif';
   popupEl.style.pointerEvents = 'auto';
 
@@ -46,9 +47,11 @@ export function createLinkPopup({
   actions.style.display = 'flex';
   actions.style.justifyContent = 'flex-end';
   actions.style.gap = '10px';
+  actions.style.flexWrap = 'nowrap';
 
   const cancel = document.createElement('button');
   cancel.type = 'button';
+  cancel.style.order = '2';
   cancel.style.padding = '10px 14px';
   cancel.style.borderRadius = '10px';
   cancel.style.border = '1px solid rgba(255,255,255,0.18)';
@@ -58,6 +61,7 @@ export function createLinkPopup({
 
   const go = document.createElement('button');
   go.type = 'button';
+  go.style.order = '1';
   go.style.padding = '10px 14px';
   go.style.borderRadius = '10px';
   go.style.border = '1px solid rgba(255,220,140,0.28)';
@@ -83,8 +87,10 @@ export function createLinkPopup({
 
   const closePopup = ({ resetFocus = false } = {}) => {
     pendingUrl = null;
+    pendingLinks = [];
     popupAnchorHouse = null;
     popupEl.style.display = 'none';
+    removeOptionButtons();
 
     if (resetFocus) {
       onResetFocus?.();
@@ -126,11 +132,70 @@ export function createLinkPopup({
     closePopup();
   });
 
+  function removeOptionButtons() {
+    actions.querySelectorAll('.popup-option-link').forEach((button) => {
+      button.remove();
+    });
+    go.style.display = '';
+    cancel.style.order = '2';
+    go.style.order = '1';
+    actions.style.justifyContent = 'flex-end';
+  }
+
+  function renderOptionButtons(links) {
+    removeOptionButtons();
+    pendingLinks = Array.isArray(links) ? links : [];
+
+    if (pendingLinks.length === 0) {
+      return;
+    }
+
+    go.style.display = 'none';
+    cancel.style.order = '3';
+    actions.style.justifyContent = 'flex-start';
+
+    pendingLinks.forEach((link, index) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'popup-option-link';
+      button.textContent = link.label || link.id || resolveText('go');
+      button.style.order = String(index + 1);
+      button.style.padding = '10px 14px';
+      button.style.borderRadius = '10px';
+      button.style.border = '1px solid rgba(255,220,140,0.28)';
+      button.style.background = 'linear-gradient(135deg, #f0b54a, #d98a2b)';
+      button.style.color = '#2a1808';
+      button.style.cursor = 'pointer';
+      button.style.fontWeight = 'bold';
+
+      button.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+
+        if (link.url) {
+          onNavigate?.(link.url);
+        }
+
+        closePopup();
+      });
+
+      actions.appendChild(button);
+    });
+  }
+
   return {
-    openPopup(name, url, house) {
-      pendingUrl = url;
+    openPopup(name, destination, house) {
+      const links = Array.isArray(destination)
+        ? destination
+        : destination?.links;
+      const url = typeof destination === 'string'
+        ? destination
+        : destination?.url;
+
+      pendingUrl = url || null;
       popupAnchorHouse = house || null;
       title.textContent = name || resolveText('fallbackLinkTitle');
+      renderOptionButtons(links);
       popupEl.style.display = 'block';
       updatePosition();
     },

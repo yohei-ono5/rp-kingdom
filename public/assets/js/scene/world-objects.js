@@ -74,6 +74,7 @@ function addWorldObject({
   wrapper.userData = {
     id: data.id,
     url: data.url,
+    links: data.links,
     isHouse: true,
     baseScale: data.scale,
     doorOffset: data.doorOffset || DEFAULT_DOOR_OFFSET,

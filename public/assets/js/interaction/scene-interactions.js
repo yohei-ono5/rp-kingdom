@@ -20,6 +20,7 @@ export function createSceneInteractionController({
   onToggleMap,
   onResetView,
   onFocusHouse,
+  onFocusPlot,
   onClickVideoBillboard,
   onCameraManualChange,
   onToggleNavMenu,
@@ -224,16 +225,11 @@ export function createSceneInteractionController({
     const clickedTarget = getHoveredTarget(event);
 
     if (clickedTarget?.type === 'plot') {
-      if (isTouch) {
-        const plot = clickedTarget.object;
-        if (selectedPlot === plot) {
-          selectedPlot = null;
-          hidePlotPanel();
-        } else {
-          selectedPlot = plot;
-          showPlotPanel(plot, event);
-        }
-      }
+      const plot = clickedTarget.object;
+      selectedPlot = isTouch ? plot : null;
+      showPlotPanel(plot, event);
+      hideHouseTooltip();
+      onFocusPlot?.(plot);
       return;
     }
 
@@ -251,7 +247,7 @@ export function createSceneInteractionController({
     }
 
     const clickedHouse = clickedTarget?.type === 'house' ? clickedTarget.object : null;
-    if (!clickedHouse?.userData.url) return;
+    if (!clickedHouse?.userData.url && !clickedHouse?.userData.links?.length) return;
 
     selectedPlot = null;
     hidePlotPanel();
