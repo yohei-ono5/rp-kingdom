@@ -138,7 +138,7 @@ export function createSceneInteractionController({
   }
 
   function onControlsChange() {
-    if (getIntroActive() || getCameraTransitionActive() || getCurrentView() === 'map') {
+    if (getIntroActive() || getCameraTransitionActive()) {
       return;
     }
 

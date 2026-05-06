@@ -87,6 +87,9 @@ document.body.appendChild(renderer.domElement);
 
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
+controls.enablePan = true;
+controls.screenSpacePanning = false;
+controls.zoomToCursor = true;
 controls.target.set(-0.8, 0, 1.2);
 controls.minDistance = 0.1;
 controls.maxDistance = 250;
@@ -186,6 +189,7 @@ let currentFocusPlot = null;
 let popupDelayTimer = 0;
 let introActive = true;
 const BILLBOARD_FOCUS_DISTANCE = 5.5;
+const BILLBOARD_FOCUS_FRAME_PADDING = 1.18;
 
 let focusRequest = null;
 
@@ -729,13 +733,26 @@ function applyBillboardFocusCamera(billboard) {
   const rotY = billboard.rotation.y;
   const normalX = Math.sin(rotY);
   const normalZ = Math.cos(rotY);
+  const distance = getBillboardFocusDistance(billboard);
 
   desiredCameraPosition.set(
-    billboardWorldPos.x + normalX * BILLBOARD_FOCUS_DISTANCE,
+    billboardWorldPos.x + normalX * distance,
     billboardWorldPos.y,
-    billboardWorldPos.z + normalZ * BILLBOARD_FOCUS_DISTANCE
+    billboardWorldPos.z + normalZ * distance
   );
   desiredTarget.copy(billboardWorldPos);
+}
+
+function getBillboardFocusDistance(billboard) {
+  const width = billboard.userData.width || 4;
+  const height = billboard.userData.height || 2.25;
+  const verticalFov = THREE.MathUtils.degToRad(camera.fov);
+  const horizontalFov = 2 * Math.atan(Math.tan(verticalFov / 2) * camera.aspect);
+  const widthFitDistance = (width / 2) / Math.tan(horizontalFov / 2);
+  const heightFitDistance = (height / 2) / Math.tan(verticalFov / 2);
+  const frameFitDistance = Math.max(widthFitDistance, heightFitDistance) * BILLBOARD_FOCUS_FRAME_PADDING;
+
+  return Math.max(BILLBOARD_FOCUS_DISTANCE, frameFitDistance);
 }
 
 function applyPlotFocusCamera(plot) {
@@ -922,7 +939,7 @@ function syncUiState() {
       ? i18n.t('hudIntro', 'Enter the clouds to begin.')
       : currentView === 'map'
         ? i18n.t('hudMap', 'MAP view: top-down overview.')
-        : i18n.t('hudVillage', 'Drag to orbit. Click a house to zoom, then confirm.');
+        : i18n.t('hudVillage', 'Drag to orbit. Wheel zooms toward the cursor. Click a house to zoom.');
   }
 }
 
