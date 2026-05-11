@@ -31,7 +31,7 @@ Three.js を使った絵本風 3D 村の試作です。`public/assets/models/Fan
 - 動画看板クリック / `Youtube` ナビボタン / MAPラベルクリックで看板正面（`BILLBOARD_FOCUS_DISTANCE`）にズームし、確認ポップアップから外部リンクへ遷移
 - 動画ファイル本体は Cloudflare R2 にホストし、CORS 経由で WebGL テクスチャに使用（リポジトリには含めない）
 - 村の空きスペースに `FOR SALE` 看板付きの売地/広告枠区画を配置（境界線、杭、看板、立て札の3Dオブジェクト）
-- `character.glb` を村の中央付近に配置し、GLBに含まれる歩行アニメーションを使って、端から端へ歩くNPC風の移動を実行。端に着くとランダムな時間だけ止まり、反対側へ戻る。建物・売地・看板には簡易障害物判定を付け、ぶつかりそうな場合は方向転換する
+- R2 上の `character.glb` を村の中央付近に配置し、GLBに含まれる歩行アニメーションを使って、端から端へ歩くNPC風の移動を実行。端に着くとランダムな時間だけ止まり、反対側へ戻る。建物・売地・看板には簡易障害物判定を付け、ぶつかりそうな場合は方向転換する
 - 売地/広告枠区画にホバーすると、区画名、価格、サイズ、説明をカーソル近くのパネルに表示し、区画が少し浮き上がる。クリックすると区画中心へズーム
 - 村ビューでは建物ホバー時にツールチップで建物名を表示、建物が僅かに拡大
 - `Language` メニューで `日本語` `English` `한국어` `Français` `繁體中文` を切り替え、選択言語は `localStorage` に保存
@@ -69,7 +69,7 @@ python3 -m http.server 5500
 - `public/assets/js/scene/sky-objects.js`: 夜の星空と月（カメラ追従）の生成と表示制御
 - `public/assets/js/systems/time-of-day.js`: `Asia/Tokyo` の取得、時間帯ライティング/太陽位置補間、時計 UI 更新
 - `public/assets/js/ui/link-popup.js`: 建物ドア／看板上に追従する確認ポップアップの生成と表示制御。単一リンクと複数リンク選択（Music の `Spotify` / `Apple Music`）に対応
-- `public/assets/models/`: 本番で使う GLB アセット（`Fantasy_House_6.glb`, `Fantasy_House.glb`）
+- `public/assets/models/`: Pages に同梱できる軽量 GLB アセット（`Fantasy_House_6.glb`, `Fantasy_House.glb`, `tree_LOD0.glb`）
 - `public/assets/videos/`: 動画看板用 mp4 のローカル置き場（`*.mp4` は `.gitignore` で除外、本番は Cloudflare R2 から配信）
 - `resources/`: 公開対象に含めない素材置き場
 - `docs/`: 開発メモ
@@ -165,6 +165,12 @@ python3 -m http.server 5500
 - 既存の動画を差し替えるだけなら R2 バケットで同名ファイルを上書きアップロード（コード変更不要）
 - 別の URL に変える場合は `site-config.js` の URL 定数を更新
 - 動画看板を新規追加するなら `VIDEO_BILLBOARDS` 配列に項目追加
+
+## 大きな3Dモデルの配信（Cloudflare R2）
+
+Cloudflare Pages は単一ファイル 25 MiB までのため、`character.glb` のような大きなモデルは R2 に置きます。ローカル確認用に `public/assets/models/character.glb` を置いても Git 管理には含めません。
+
+現在のキャラクターモデル URL は `site-config.js` の `CHARACTER_MODEL_URL` で管理します。R2 側で `character.glb` を差し替えた場合、同じファイル名ならコード変更は不要です。別名や別バケットにする場合はこの URL を更新してください。
 
 ### コスト
 

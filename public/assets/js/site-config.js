@@ -1,8 +1,8 @@
 const STANDARD_HOUSE_MODEL_URL = new URL('../models/Fantasy_House_6.glb', import.meta.url).href;
 const ARTIST_HOUSE_MODEL_URL = new URL('../models/Fantasy_House.glb', import.meta.url).href;
 const TREE_MODEL_URL = new URL('../models/tree_LOD0.glb', import.meta.url).href;
-const CHARACTER_MODEL_URL = new URL('../models/character.glb', import.meta.url).href;
 const YOUTUBE_PROMO_VIDEO_URL = 'https://pub-8c47d9817fce4e86a82d02fad188f8e8.r2.dev/youtube-promo.mp4';
+const CHARACTER_MODEL_URL = 'https://pub-8c47d9817fce4e86a82d02fad188f8e8.r2.dev/character.glb';
 
 export const HOUSE_DESTINATIONS = [
   {

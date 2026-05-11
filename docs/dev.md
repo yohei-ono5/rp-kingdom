@@ -25,7 +25,7 @@
 ### アセット
 - `public/assets/models/Fantasy_House_6.glb`: 通常の建物（Company / Music / SNS / Store）
 - `public/assets/models/Fantasy_House.glb`: 前面のアーティストハウス（Artist）
-- `public/assets/models/character.glb`: 村を歩くNPCキャラクター
+- R2 `character.glb`: 村を歩くNPCキャラクター。Pages の単一ファイル 25 MiB 制限を避けるため、Git/Pages には同梱しない
 - `public/assets/videos/`: 動画看板用 mp4 のローカル置き場（`.gitignore` で除外、本番は Cloudflare R2 から配信）
 - `resources/models/tree_LOD0.glb`: 未使用アセット
 
@@ -48,7 +48,7 @@
 - `Fantasy_House_6.glb` を使う通常ハウス（Company / Music / SNS / Store）は約1.5倍に拡大。拡大後の干渉を避けるためSNSハウスは西側（X=-20.4）へ配置
 - 動画看板（`VIDEO_BILLBOARDS`）は Music ハウスの南側に配置、画面が南向きで `MeshBasicMaterial` + `VideoTexture` により時間帯に左右されず自発光表示。クリック / `Youtube` ナビボタン / MAPラベルで看板正面にカメラがズームして確認ポップアップから外部リンク（YouTube）へ
 - 売地/広告枠区画は `FOR SALE` 看板、境界線、杭で構成した 3D オブジェクトとして表示
-- キャラクター（`CHARACTERS`）は `character.glb` を使用し、高さを0.57に正規化して地面に接地。GLB内のルート移動を除去した歩行アニメーションを再生しつつ、サイト側で端から端へ歩かせる
+- キャラクター（`CHARACTERS`）は R2 上の `character.glb` を使用し、高さを0.57に正規化して地面に接地。GLB内のルート移動を除去した歩行アニメーションを再生しつつ、サイト側で端から端へ歩かせる
 - キャラクターは端に着くとランダムな待機時間を挟んで反対側へ戻る。建物・売地・看板は簡易障害物として扱い、ぶつかりそうな場合は侵入せず方向転換する
 - PC では売地/広告枠区画ホバーで右下パネルに詳細を表示し、区画が僅かに浮き上がる
 - スマホ（タッチ入力）では区画タップで詳細パネルを固定表示。同じ区画の再タップ or 他の場所タップで閉じる
@@ -85,6 +85,7 @@
 - 新しい動画看板を追加する場合は `VIDEO_BILLBOARDS` に項目追加（`id` / `position` / `rotationY` / `width` / `height` / `videoUrl` / `url`）。同じ `id` で `i18n.js` の `destinations` に文言を追加するとナビボタンとMAPラベルに反映される
 - キャラクターの配置、向き、高さ、移動範囲、歩行速度、待機時間は `CHARACTERS` の `position` / `rotationY` / `height` / `movement` で調整する。横歩きに見える場合は `movement.facingOffset` でモデル正面軸を補正する
 - 動画ファイルは Cloudflare R2 にホスト（egress 無料）し、`site-config.js` の URL 定数（`YOUTUBE_PROMO_VIDEO_URL` 等）を R2 の `https://pub-xxxx.r2.dev/<file>.mp4` に差し替え。ローカル開発用に `public/assets/videos/` に同名 mp4 を置いてもよい（`.gitignore` で除外済み）
+- 大きな3Dモデルも Cloudflare R2 にホストする。`character.glb` は Pages の単一ファイル 25 MiB 制限を超えるため、`public/assets/models/character.glb` は `.gitignore` で除外し、`CHARACTER_MODEL_URL` からR2 URLを読む
 - R2 の CORS ポリシーは `AllowedOrigins: ["*"]` / `AllowedMethods: ["GET", "HEAD"]` を許可（`THREE.VideoTexture` で WebGL テクスチャ化するため必須）
 - 動画要素は `crossOrigin = 'anonymous'` 必須（R2 など外部 CDN から WebGL に流すため）
 - イントロの見た目調整は `public/index.html` の `#intro-overlay` 周辺

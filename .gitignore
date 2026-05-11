@@ -1,3 +1,4 @@
 .DS_Store
 .wrangler/
 public/assets/videos/*.mp4
+public/assets/models/character.glb
