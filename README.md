@@ -170,7 +170,7 @@ python3 -m http.server 5500
 
 Cloudflare Pages は単一ファイル 25 MiB までのため、`character.glb` のような大きなモデルは R2 に置きます。ローカル確認用に `public/assets/models/character.glb` を置いても Git 管理には含めません。
 
-現在のキャラクターモデル URL は `site-config.js` の `CHARACTER_MODEL_URL` で管理します。R2 側で `character.glb` を差し替えた場合、同じファイル名ならコード変更は不要です。別名や別バケットにする場合はこの URL を更新してください。
+現在のキャラクターモデル URL は `site-config.js` の `CHARACTER_MODEL_URL` で管理します。R2 側の `3D_object/character.glb` を差し替えた場合、同じファイル名ならコード変更は不要です。別名や別バケットにする場合はこの URL を更新してください。
 
 ### コスト
 

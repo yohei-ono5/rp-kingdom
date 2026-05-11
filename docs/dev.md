@@ -85,7 +85,7 @@
 - 新しい動画看板を追加する場合は `VIDEO_BILLBOARDS` に項目追加（`id` / `position` / `rotationY` / `width` / `height` / `videoUrl` / `url`）。同じ `id` で `i18n.js` の `destinations` に文言を追加するとナビボタンとMAPラベルに反映される
 - キャラクターの配置、向き、高さ、移動範囲、歩行速度、待機時間は `CHARACTERS` の `position` / `rotationY` / `height` / `movement` で調整する。横歩きに見える場合は `movement.facingOffset` でモデル正面軸を補正する
 - 動画ファイルは Cloudflare R2 にホスト（egress 無料）し、`site-config.js` の URL 定数（`YOUTUBE_PROMO_VIDEO_URL` 等）を R2 の `https://pub-xxxx.r2.dev/<file>.mp4` に差し替え。ローカル開発用に `public/assets/videos/` に同名 mp4 を置いてもよい（`.gitignore` で除外済み）
-- 大きな3Dモデルも Cloudflare R2 にホストする。`character.glb` は Pages の単一ファイル 25 MiB 制限を超えるため、`public/assets/models/character.glb` は `.gitignore` で除外し、`CHARACTER_MODEL_URL` からR2 URLを読む
+- 大きな3Dモデルも Cloudflare R2 にホストする。`3D_object/character.glb` は Pages の単一ファイル 25 MiB 制限を超えるため、`public/assets/models/character.glb` は `.gitignore` で除外し、`CHARACTER_MODEL_URL` からR2 URLを読む
 - R2 の CORS ポリシーは `AllowedOrigins: ["*"]` / `AllowedMethods: ["GET", "HEAD"]` を許可（`THREE.VideoTexture` で WebGL テクスチャ化するため必須）
 - 動画要素は `crossOrigin = 'anonymous'` 必須（R2 など外部 CDN から WebGL に流すため）
 - イントロの見た目調整は `public/index.html` の `#intro-overlay` 周辺
