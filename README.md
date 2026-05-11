@@ -21,6 +21,7 @@ Three.js を使った絵本風 3D 村の試作です。`public/assets/models/Fan
 ### 見え方と演出
 
 - `Artist` だけ別モデル（`Fantasy_House.glb`）、他の建物（Company / Music / SNS / Store）は共通モデル（`Fantasy_House_6.glb`）を使用
+- `Fantasy_House_6.glb` を使う通常ハウスは初期値から約1.5倍に拡大し、SNSハウスはMusicハウスとの干渉を避けるため西側（X=-20.4）へ配置
 - 時計は日本語では `Asia/Tokyo` のみ、日本語以外では `Asia/Tokyo` と選択言語ごとの代表タイムゾーン（例: `Europe/Paris`）を2行表示。時間帯演出は常に `Asia/Tokyo` 基準
 - 深夜・朝焼け・昼・午後・夕暮れ・夜の 6 段階で空、フォグ、地面、アンビエント/サン/フィルライト、トーンマッピング露出を補間し、朝夕は太陽位置に応じて影の向きも変化
 - 夜間帯（概ね 19 時過ぎ〜翌 5 時前）はカメラに追従する星空と月、月のハロースプライトが徐々に現れる
@@ -30,6 +31,7 @@ Three.js を使った絵本風 3D 村の試作です。`public/assets/models/Fan
 - 動画看板クリック / `Youtube` ナビボタン / MAPラベルクリックで看板正面（`BILLBOARD_FOCUS_DISTANCE`）にズームし、確認ポップアップから外部リンクへ遷移
 - 動画ファイル本体は Cloudflare R2 にホストし、CORS 経由で WebGL テクスチャに使用（リポジトリには含めない）
 - 村の空きスペースに `FOR SALE` 看板付きの売地/広告枠区画を配置（境界線、杭、看板、立て札の3Dオブジェクト）
+- `character.glb` を村の中央付近に配置し、GLBに含まれる歩行アニメーションを使って、端から端へ歩くNPC風の移動を実行。端に着くとランダムな時間だけ止まり、反対側へ戻る。建物・売地・看板には簡易障害物判定を付け、ぶつかりそうな場合は方向転換する
 - 売地/広告枠区画にホバーすると、区画名、価格、サイズ、説明をカーソル近くのパネルに表示し、区画が少し浮き上がる。クリックすると区画中心へズーム
 - 村ビューでは建物ホバー時にツールチップで建物名を表示、建物が僅かに拡大
 - `Language` メニューで `日本語` `English` `한국어` `Français` `繁體中文` を切り替え、選択言語は `localStorage` に保存
@@ -61,6 +63,7 @@ python3 -m http.server 5500
 - `public/assets/js/camera/transition-paths.js`: `intro-enter` / `map-enter` / `map-exit` のベジェ軌道生成
 - `public/assets/js/interaction/scene-interactions.js`: ポインタ/ホバー/クリック処理、ツールチップと売地パネルの出し分け、ナビボタン → 建物 or 看板の振り分け
 - `public/assets/js/scene/world-objects.js`: GLB 読み込み、マテリアル補正、建物配置、MAP 用マーカー生成
+- `public/assets/js/scene/characters.js`: キャラクターGLBの読み込み、高さ正規化、地面合わせ、アニメーション再生、NPC風の往復移動、簡易障害物回避
 - `public/assets/js/scene/land-plots.js`: 売地/広告枠区画の3D生成とホバー/MAP 遷移の更新処理
 - `public/assets/js/scene/video-billboards.js`: 動画看板の3D生成（フレーム + スクリーン + 支柱）、`VideoTexture` 管理、autoplay フォールバック
 - `public/assets/js/scene/sky-objects.js`: 夜の星空と月（カメラ追従）の生成と表示制御
@@ -81,6 +84,7 @@ python3 -m http.server 5500
 - 建物の配置（`position`）、スケール（`scale`）、向き（`rotationY`）を変える
 - 建物モデル（`modelUrl`）を差し替える
 - ドア位置とドアの向き（`doorOffset`, `doorFacing`）を微調整してフォーカスカメラとポップアップ位置を合わせる
+- キャラクターの配置、向き、高さ、移動範囲は `CHARACTERS` の `position` / `rotationY` / `height` / `movement` を変える
 - 売地/広告枠区画のサイズ、配置を変える
 - 動画看板の `position` / `rotationY` / `width` / `height`、再生する動画 URL（`videoUrl`、R2 など外部 CDN 推奨）、遷移先 URL（`url`）を変える
 

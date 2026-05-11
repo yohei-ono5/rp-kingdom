@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import {
+  CHARACTERS,
   FRONT_HOUSE_DESTINATION,
   HOUSE_DESTINATIONS,
   LAND_PLOTS,
@@ -17,6 +18,7 @@ import {
   resolveCameraTransitionMode
 } from './camera/transition-paths.js';
 import { loadWorldObjects, renderDestinationButtons } from './scene/world-objects.js';
+import { createCharacterObstacles, initCharacters, updateCharacterAnimations } from './scene/characters.js';
 import { initLandPlots, updateLandPlotLanguage, updateLandPlots } from './scene/land-plots.js';
 import { createTreeExclusions, initTrees } from './scene/trees.js';
 import { initVideoBillboards } from './scene/video-billboards.js';
@@ -149,6 +151,9 @@ const mapLabelMeta = [];
 const landPlotTargets = [];
 const landPlotMeta = [];
 const videoBillboardTargets = [];
+const characterActors = [];
+const characterMixers = [];
+const animationClock = new THREE.Clock();
 
 const ui = {
   introOverlay: document.getElementById('intro-overlay'),
@@ -532,6 +537,17 @@ try {
 } catch (error) {
   console.error('Failed to initialize video billboards.', error);
 }
+void initCharacters({
+  characters: CHARACTERS,
+  parentGroup: sceneryGroup,
+  mixers: characterMixers,
+  actors: characterActors,
+  obstacles: createCharacterObstacles({
+    houses: [...HOUSE_DESTINATIONS, FRONT_HOUSE_DESTINATION],
+    plots: LAND_PLOTS,
+    billboards: VIDEO_BILLBOARDS
+  })
+});
 void initTrees({
   treeConfig: TREE_SCATTER,
   parentGroup: sceneryGroup,
@@ -1118,6 +1134,7 @@ function updateHouseScales() {
 
 function animate() {
   requestAnimationFrame(animate);
+  const deltaTime = animationClock.getDelta();
 
   timeOfDay.update();
 
@@ -1139,6 +1156,11 @@ function animate() {
     landPlotMeta,
     currentHoverPlot: interaction.getCurrentHoverPlot(),
     viewTransitionProgress: viewTransition.progress
+  });
+  updateCharacterAnimations({
+    mixers: characterMixers,
+    actors: characterActors,
+    deltaTime
   });
   updateFocusPopup();
 

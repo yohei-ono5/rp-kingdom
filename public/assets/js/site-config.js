@@ -1,6 +1,7 @@
 const STANDARD_HOUSE_MODEL_URL = new URL('../models/Fantasy_House_6.glb', import.meta.url).href;
 const ARTIST_HOUSE_MODEL_URL = new URL('../models/Fantasy_House.glb', import.meta.url).href;
 const TREE_MODEL_URL = new URL('../models/tree_LOD0.glb', import.meta.url).href;
+const CHARACTER_MODEL_URL = new URL('../models/character.glb', import.meta.url).href;
 const YOUTUBE_PROMO_VIDEO_URL = 'https://pub-8c47d9817fce4e86a82d02fad188f8e8.r2.dev/youtube-promo.mp4';
 
 export const HOUSE_DESTINATIONS = [
@@ -9,7 +10,7 @@ export const HOUSE_DESTINATIONS = [
     url: 'https://thecrown-pro.com/',
     modelUrl: STANDARD_HOUSE_MODEL_URL,
     position: [-4.5, 0, -1.8],
-    scale: 0.72,
+    scale: 1.08,
     rotationY: 0.08,
     doorOffset: [0.08, 0, 0.92],
     doorFacing: [0, 0, 1]
@@ -30,7 +31,7 @@ export const HOUSE_DESTINATIONS = [
     ],
     modelUrl: STANDARD_HOUSE_MODEL_URL,
     position: [-11.5, 0, 6.8],
-    scale: 0.68,
+    scale: 1.02,
     rotationY: -0.28,
     doorOffset: [0.08, 0, 0.92],
     doorFacing: [0, 0, 1]
@@ -39,8 +40,8 @@ export const HOUSE_DESTINATIONS = [
     id: 'sns',
     url: 'https://www.instagram.com/rujie.official/',
     modelUrl: STANDARD_HOUSE_MODEL_URL,
-    position: [-17.2, 0, 6.0],
-    scale: 0.66,
+    position: [-20.4, 0, 6.0],
+    scale: 0.99,
     rotationY: -0.18,
     doorOffset: [0.08, 0, 0.92],
     doorFacing: [0, 0, 1]
@@ -50,7 +51,7 @@ export const HOUSE_DESTINATIONS = [
     url: 'https://store.rujie-official.com/',
     modelUrl: STANDARD_HOUSE_MODEL_URL,
     position: [7.8, 0, -6.5],
-    scale: 0.7,
+    scale: 1.05,
     rotationY: 0.35,
     doorOffset: [0.08, 0, 0.92],
     doorFacing: [0, 0, 1]
@@ -77,6 +78,29 @@ export const VIDEO_BILLBOARDS = [
     rotationY: 0,
     width: 4.0,
     height: 2.25
+  }
+];
+
+export const CHARACTERS = [
+  {
+    id: 'main-character',
+    modelUrl: CHARACTER_MODEL_URL,
+    position: [1.4, 0, 4.2],
+    rotationY: -0.55,
+    height: 0.57,
+    animationIndex: 0,
+    movement: {
+      enabled: true,
+      bounds: {
+        minX: -23,
+        maxX: 23,
+        minZ: 1.8,
+        maxZ: 8.2
+      },
+      speedRange: [0.45, 0.76],
+      pauseRange: [1.4, 5.6],
+      facingOffset: -Math.PI / 2
+    }
   }
 ];
 
