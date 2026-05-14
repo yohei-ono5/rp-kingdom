@@ -29,7 +29,9 @@ Three.js を使った絵本風 3D 村の試作です。`public/assets/models/Fan
 - 建物クリック時はドア位置と向きを基準にズームし、確認ポップアップをドア上にスクリーン投影して表示
 - Music ハウスの南側に動画看板（電光掲示板）を設置。フレーム + 動画スクリーン + 支柱を `Group` でまとめ、`HTMLVideoElement` + `THREE.VideoTexture` + `MeshBasicMaterial` で時間帯に左右されない自発光表示
 - 動画看板クリック / `Youtube` ナビボタン / MAPラベルクリックで看板正面（`BILLBOARD_FOCUS_DISTANCE`）にズームし、確認ポップアップから外部リンクへ遷移
+- 動画看板は通常の村ビュー中のみ再生し、MAP 表示中やタブ非表示時は pause して `VideoTexture` の更新負荷を抑える
 - 動画ファイル本体は Cloudflare R2 にホストし、CORS 経由で WebGL テクスチャに使用（リポジトリには含めない）
+- `ENTER` 後は上空から降る粒子が家・看板・地面へ集まって世界を形作り、地面だけを薄く先行表示して降下時の距離感を補助
 - 村の空きスペースに `FOR SALE` 看板付きの売地/広告枠区画を配置（境界線、杭、看板、立て札の3Dオブジェクト）
 - R2 上の `character.glb` を村の中央付近に配置し、GLBに含まれる歩行アニメーションを使って、端から端へ歩くNPC風の移動を実行。端に着くとランダムな時間だけ止まり、反対側へ戻る。建物・売地・看板には簡易障害物判定を付け、ぶつかりそうな場合は方向転換する
 - 売地/広告枠区画にホバーすると、区画名、価格、サイズ、説明をカーソル近くのパネルに表示し、区画が少し浮き上がる。クリックすると区画中心へズーム
@@ -38,6 +40,8 @@ Three.js を使った絵本風 3D 村の試作です。`public/assets/models/Fan
 - ドラッグとクリックを閾値（6px）で分離し、OrbitControls 操作中の誤反応を抑制
 - GLB 読み込み時に透明マテリアルを補正して、建物が透けにくい状態へ調整
 - 高DPI画面での負荷を抑えるため、レンダリング解像度（最大 1.35）とシャドウマップサイズ（1024）を制限
+- タブ非表示時は描画ループを停止し、通常アイドル時は 30fps 相当に間引く。イントロ、カメラ遷移、MAP、ポップアップ、操作直後は 60fps 相当に戻す
+- イントロの粒子形成が完了した後は粒子オブジェクトを非表示にし、更新処理を早期 return して常時負荷を下げる
 
 ## 起動
 
@@ -56,7 +60,7 @@ python3 -m http.server 5500
 
 - `public/`: Cloudflare Pages にそのまま配信する公開物
 - `public/index.html`: ナビ、HUD、イントロ、時計、Languageメニュー、コンパス、MAPラベル、ツールチップ、売地パネルのマークアップとスタイル
-- `public/assets/js/main.js`: 起動処理、シーン/カメラ/ライト構築、ビュー状態管理、アニメーションループ
+- `public/assets/js/main.js`: 起動処理、シーン/カメラ/ライト構築、ビュー状態管理、アニメーションループ、省電力用の FPS 間引きとタブ非表示時停止
 - `public/assets/js/site-config.js`: 建物/看板/売地のID、遷移先 URL、配置、ドア設定、サイズ、動画 URL など非表示設定の定義
 - `public/assets/js/i18n.js`: Languageメニュー、ナビ、HUD、ポップアップ、時計ラベル、建物/看板名、売地文言の多言語辞書
 - `public/assets/js/camera/focus-camera.js`: ドア基点のフォーカスカメラ算出、ワールド→スクリーン投影
@@ -65,7 +69,8 @@ python3 -m http.server 5500
 - `public/assets/js/scene/world-objects.js`: GLB 読み込み、マテリアル補正、建物配置、MAP 用マーカー生成
 - `public/assets/js/scene/characters.js`: キャラクターGLBの読み込み、高さ正規化、地面合わせ、アニメーション再生、NPC風の往復移動、簡易障害物回避
 - `public/assets/js/scene/land-plots.js`: 売地/広告枠区画の3D生成とホバー/MAP 遷移の更新処理
-- `public/assets/js/scene/video-billboards.js`: 動画看板の3D生成（フレーム + スクリーン + 支柱）、`VideoTexture` 管理、autoplay フォールバック
+- `public/assets/js/scene/video-billboards.js`: 動画看板の3D生成（フレーム + スクリーン + 支柱）、`VideoTexture` 管理、autoplay フォールバック、村ビュー/MAP/タブ状態に応じた再生制御
+- `public/assets/js/scene/particle-field.js`: イントロ時に家・看板・地面へ集まる形成粒子の生成、パステル色化、形成完了後の非表示制御
 - `public/assets/js/scene/sky-objects.js`: 夜の星空と月（カメラ追従）の生成と表示制御
 - `public/assets/js/systems/time-of-day.js`: `Asia/Tokyo` の取得、時間帯ライティング/太陽位置補間、時計 UI 更新
 - `public/assets/js/ui/link-popup.js`: 建物ドア／看板上に追従する確認ポップアップの生成と表示制御。単一リンクと複数リンク選択（Music の `Spotify` / `Apple Music`）に対応
@@ -106,7 +111,10 @@ python3 -m http.server 5500
 - 確認ポップアップは `ui/link-popup.js` が DOM を生成し、毎フレーム `updatePosition` でドア位置に追従
 - 建物クリック時のフォーカス位置は `camera/focus-camera.js` の `applyFocusCamera`（ドアから前に出て少し上から見下ろす）。売地/広告枠区画は `main.js` の `applyPlotFocusCamera` で区画中心へズーム
 - 動画看板の見た目（フレーム / スクリーン / 支柱の素材・サイズ）は `scene/video-billboards.js` の定数とマテリアル定義
+- 動画看板の再生制御は `scene/video-billboards.js` の `updateVideoBillboardPlayback` で管理。村ビューでは再生し、MAP とタブ非表示時は pause する
 - 動画看板のフォーカス距離は `main.js` の `BILLBOARD_FOCUS_DISTANCE`、配置・回転は `site-config.js` の `VIDEO_BILLBOARDS`
+- イントロ形成粒子は `scene/particle-field.js` で管理。粒子数、開始高度、分散範囲、パステル変換、形成完了後の停止は同ファイルの定数と `update` で調整
+- 描画ループの負荷制御は `main.js` の `ACTIVE_FRAME_INTERVAL` / `IDLE_FRAME_INTERVAL` / `INTERACTION_ACTIVE_WINDOW` と `bindRenderPerformanceEvents` / `shouldUseActiveFrameRate` で管理
 - コンパスの見た目・配置は `public/index.html` の `#compass-widget` 周辺、表示制御は `main.js` の `syncUiState`
 
 ## Cloudflare Pages で公開する

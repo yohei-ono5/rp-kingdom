@@ -4,7 +4,7 @@
 
 ### HTML / エントリ
 - `public/index.html`: 画面全体の UI（ナビ、時計、Languageメニュー、コンパス、MAPラベル、イントロオーバーレイ、建物ツールチップ、売地パネル）とスタイル、importmap で Three.js を読み込み
-- `public/assets/js/main.js`: 起動処理、シーン/カメラ/レンダラ構築、ビュー状態管理、カメラ補間、アニメーションループ
+- `public/assets/js/main.js`: 起動処理、シーン/カメラ/レンダラ構築、ビュー状態管理、カメラ補間、アニメーションループ、省電力用の FPS 間引きとタブ非表示時停止
 
 ### 設定
 - `public/assets/js/site-config.js`: 通常ハウス 4 件（`HOUSE_DESTINATIONS`）、前面のアーティストハウス（`FRONT_HOUSE_DESTINATION`）、キャラクター（`CHARACTERS`）、売地/広告枠区画（`LAND_PLOTS`）、動画看板（`VIDEO_BILLBOARDS`）のID、URL、配置、サイズなど非表示設定
@@ -17,7 +17,8 @@
 - `public/assets/js/scene/world-objects.js`: GLB 読み込み（モデル URL ごとにキャッシュ）、不透明マテリアル補正、建物配置、ナビボタン生成、MAP 用マーカー作成
 - `public/assets/js/scene/characters.js`: キャラクターGLBの読み込み、高さ正規化、地面合わせ、アニメーション再生、NPC風の往復移動、簡易障害物回避
 - `public/assets/js/scene/land-plots.js`: 売地/広告枠の 3D 生成（床・境界・杭・看板テクスチャ）とホバー/MAP 遷移更新
-- `public/assets/js/scene/video-billboards.js`: 動画看板の 3D 生成（フレーム + 動画スクリーン + 支柱を `Group` でまとめる）、`HTMLVideoElement` + `THREE.VideoTexture` + `MeshBasicMaterial` でライト非依存の自発光表示、autoplay 失敗時のジェスチャ・フォールバック
+- `public/assets/js/scene/video-billboards.js`: 動画看板の 3D 生成（フレーム + 動画スクリーン + 支柱を `Group` でまとめる）、`HTMLVideoElement` + `THREE.VideoTexture` + `MeshBasicMaterial` でライト非依存の自発光表示、autoplay 失敗時のジェスチャ・フォールバック、村ビュー/MAP/タブ状態に応じた再生制御
+- `public/assets/js/scene/particle-field.js`: イントロ時に家・看板・地面へ集まる形成粒子の生成、パステル色化、形成完了後の非表示制御
 - `public/assets/js/scene/sky-objects.js`: カメラ追従の星空と月、ハロースプライト（夜間のみフェードイン）
 - `public/assets/js/systems/time-of-day.js`: `Asia/Tokyo` の取得、時間帯ごとのライティング/太陽位置を補間、時計 UI 更新、`?hour` 指定時は固定
 - `public/assets/js/ui/link-popup.js`: 確認ポップアップの DOM 生成、アンカー（ドアまたは看板）のワールド座標をスクリーン投影して毎フレーム追従
@@ -32,6 +33,7 @@
 ## 現状の仕様
 
 - 初回表示は雲に包まれたイントロ画面で、`ENTER` ボタンまたは Enter キーで降下開始。MAP 高度（y=75）から HOME 位置までベジェで降下する `intro-enter` 遷移
+- `ENTER` 後は上空から降るパステル粒子が家・看板・地面へ集まって世界を形成する。地面だけは薄く先行表示し、降下時の距離感を補助する。形成完了後の粒子は非表示になり更新処理も止まる
 - 上ナビ左側に `ARTIST NAME` ブロック + 時計、右側に `HOME` + 動的生成されるナビボタン（`Artist` `Company` `Music` `Store` `Youtube`）+ `MAP` + `Language`
 - `HOME` は初期カメラ位置（通常村ビュー）に戻る
 - 各ナビボタン／3D オブジェクトのクリックはどちらも、対象前までズーム → 少し待って確認ポップアップ → 移動またはキャンセル
@@ -47,6 +49,7 @@
 - 夜間は各ハウスに窓明かり/玄関ランタンの `PointLight` が自動で灯る（`timeOfDayState.sunIntensity` を元にした nightFactor で減衰、MAP 時は弱める）
 - `Fantasy_House_6.glb` を使う通常ハウス（Company / Music / SNS / Store）は約1.5倍に拡大。拡大後の干渉を避けるためSNSハウスは西側（X=-20.4）へ配置
 - 動画看板（`VIDEO_BILLBOARDS`）は Music ハウスの南側に配置、画面が南向きで `MeshBasicMaterial` + `VideoTexture` により時間帯に左右されず自発光表示。クリック / `Youtube` ナビボタン / MAPラベルで看板正面にカメラがズームして確認ポップアップから外部リンク（YouTube）へ
+- 動画看板は通常の村ビュー中のみ再生し、MAP 表示中やタブ非表示時は pause して `VideoTexture` のデコード/更新負荷を抑える
 - 売地/広告枠区画は `FOR SALE` 看板、境界線、杭で構成した 3D オブジェクトとして表示
 - キャラクター（`CHARACTERS`）は R2 上の `character.glb` を使用し、高さを0.57に正規化して地面に接地。GLB内のルート移動を除去した歩行アニメーションを再生しつつ、サイト側で端から端へ歩かせる
 - キャラクターは端に着くとランダムな待機時間を挟んで反対側へ戻る。建物・売地・看板は簡易障害物として扱い、ぶつかりそうな場合は侵入せず方向転換する
@@ -56,6 +59,7 @@
 - ドラッグ閾値（6px）を超えた pointerup ではクリック判定しない
 - スマホ幅（≤720px）ではナビ右側がハンバーガーボタン＋ドロップダウンに切替。Languageメニューもこの中に入り、ボタン押下 / ナビ外タップ / Esc で自動クローズ
 - 高 DPI 画面は `MAX_RENDER_PIXEL_RATIO = 1.35` でクランプ、シャドウマップは 1024
+- タブ非表示時は描画ループを停止し、通常アイドル時は 30fps 相当に間引く。イントロ、カメラ遷移、MAP、ポップアップ、操作直後は 60fps 相当に戻す
 - `DirectionalLight` の影カメラは `±25` 単位の直交フラスタムで全建物を含む（影クリップ防止、`shadow.bias = -0.0005`）
 - フォグの近/遠距離はビューに応じて補間（村: `28/70`、MAP: `60/180`）
 
@@ -88,7 +92,9 @@
 - 大きな3Dモデルも Cloudflare R2 にホストする。`3D_object/character.glb` は Pages の単一ファイル 25 MiB 制限を超えるため、`public/assets/models/character.glb` は `.gitignore` で除外し、`CHARACTER_MODEL_URL` からR2 URLを読む
 - R2 の CORS ポリシーは `AllowedOrigins: ["*"]` / `AllowedMethods: ["GET", "HEAD"]` を許可（`THREE.VideoTexture` で WebGL テクスチャ化するため必須）
 - 動画要素は `crossOrigin = 'anonymous'` 必須（R2 など外部 CDN から WebGL に流すため）
+- 動画看板の再生制御は `scene/video-billboards.js` の `updateVideoBillboardPlayback` で管理。村ビューでは再生し、MAP とタブ非表示時は pause する
 - イントロの見た目調整は `public/index.html` の `#intro-overlay` 周辺
+- イントロ形成粒子は `scene/particle-field.js` で管理。粒子数、開始高度、分散範囲、パステル変換、地面先行表示との兼ね合い、形成完了後の停止は同ファイルと `main.js` の `PARTICLE_*` 定数で調整
 - 時計の表示・配置は `public/index.html` の `#tod-widget` と `.nav-left` 周辺
 - Languageメニューの見た目は `public/index.html` の `.language-menu` 周辺、言語一覧・代表タイムゾーン・文言は `public/assets/js/i18n.js`
 - コンパスの見た目・位置は `public/index.html` の `#compass-widget` 周辺、表示制御は `public/assets/js/main.js` の `syncUiState`
@@ -101,6 +107,7 @@
 - フォーカスカメラの距離・高さは `FOCUS_CAMERA_OPTIONS`（`cameraDistance` でドアからの距離、`cameraHeight` で高さ、`targetHeight` で注視点高さ）
 - 看板フォーカス時のカメラ距離は `BILLBOARD_FOCUS_DISTANCE`
 - 看板の枠・スクリーン・支柱の見た目は `public/assets/js/scene/video-billboards.js` の `FRAME_DEPTH` / `FRAME_THICKNESS` / `POST_RADIUS` / マテリアル定義
+- 描画ループの負荷制御は `public/assets/js/main.js` の `ACTIVE_FRAME_INTERVAL` / `IDLE_FRAME_INTERVAL` / `INTERACTION_ACTIVE_WINDOW` と `bindRenderPerformanceEvents` / `shouldUseActiveFrameRate` で管理
 - 時間帯ごとの光・太陽位置・影の向きの調整は `public/assets/js/systems/time-of-day.js` の `timeOfDayStops`
 - 夜のハウス明かり（色・距離・基準強度）は `public/assets/js/scene/world-objects.js` の `PointLight` 生成部、点灯カーブは `public/assets/js/main.js` の `nightFactor` 式
 - 夜空の表示量や星・月の挙動は `public/assets/js/scene/sky-objects.js`
@@ -108,4 +115,4 @@
 - スマホ用ハンバーガー／ドロワーのスタイルは `public/index.html` の `.nav-menu-toggle` と `@media (max-width: 720px)` 内の `.nav-right`
 - スマホでの区画タップ選択ロジックは `public/assets/js/interaction/scene-interactions.js` の `selectedPlot` 関連
 - 影が切れる場合は `sunLight.shadow.camera.left/right/top/bottom` の範囲を広げる（`initLights()` 内）
-- 描画負荷が高い場合は `MAX_RENDER_PIXEL_RATIO` または `SHADOW_MAP_SIZE` を下げる
+- 描画負荷が高い場合は `MAX_RENDER_PIXEL_RATIO` または `SHADOW_MAP_SIZE` を下げる。常時負荷は `IDLE_FRAME_INTERVAL`、イントロ後の粒子負荷は `particle-field.js` の完了判定、動画負荷は `updateVideoBillboardPlayback` の再生条件を確認する

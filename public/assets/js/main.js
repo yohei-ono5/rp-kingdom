@@ -21,7 +21,7 @@ import { loadWorldObjects, renderDestinationButtons } from './scene/world-object
 import { createCharacterObstacles, initCharacters, updateCharacterAnimations } from './scene/characters.js';
 import { initLandPlots, updateLandPlotLanguage, updateLandPlots } from './scene/land-plots.js';
 import { createTreeExclusions, initTrees } from './scene/trees.js';
-import { initVideoBillboards } from './scene/video-billboards.js';
+import { initVideoBillboards, updateVideoBillboardPlayback } from './scene/video-billboards.js';
 import { createSkyObjects } from './scene/sky-objects.js';
 import { createParticleField } from './scene/particle-field.js';
 import { createSceneInteractionController } from './interaction/scene-interactions.js';
@@ -51,6 +51,9 @@ const MAP_MAX_DISTANCE = 95;
 const MAX_RENDER_PIXEL_RATIO = 1.35;
 const SHADOW_MAP_SIZE = 1024;
 const DOOR_POPUP_HEIGHT = 1.85;
+const ACTIVE_FRAME_INTERVAL = 1000 / 60;
+const IDLE_FRAME_INTERVAL = 1000 / 30;
+const INTERACTION_ACTIVE_WINDOW = 900;
 const FOCUS_CAMERA_OPTIONS = Object.freeze({
   cameraDistance: 4.4,
   cameraHeight: 1.95,
@@ -200,6 +203,10 @@ let currentFocusPlot = null;
 let popupDelayTimer = 0;
 let introActive = true;
 let particleFormationStartedAt = 0;
+let animationFrameId = 0;
+let pageVisible = document.visibilityState !== 'hidden';
+let lastFrameTime = 0;
+let lastInteractionAt = performance.now();
 const BILLBOARD_FOCUS_DISTANCE = 5.5;
 const BILLBOARD_FOCUS_FRAME_PADDING = 1.18;
 
@@ -291,6 +298,7 @@ const interaction = createSceneInteractionController({
   onFocusPlot: (plot) => triggerPlotFocus(plot),
   onClickVideoBillboard: (billboard) => triggerVideoBillboardClick(billboard),
   onCameraManualChange: () => {
+    markInteractionActive();
     desiredCameraPosition.copy(camera.position);
     desiredTarget.copy(controls.target);
   },
@@ -584,17 +592,19 @@ void loadWorldObjects({
   refreshParticleFormationTargets();
 });
 interaction.bindEvents();
+bindRenderPerformanceEvents();
 bindLanguageEvents();
 applyLanguage();
 timeOfDay.update(true);
 applyViewState({ preserveFocus: true });
-animate();
+startAnimationLoop();
 
 function startIntroExperience() {
   if (!introActive) {
     return;
   }
 
+  markInteractionActive();
   introActive = false;
   particleFormationStartedAt = performance.now();
   document.body.classList.remove('intro-active');
@@ -619,7 +629,36 @@ function openLinkPopup(name, destination) {
 }
 
 function closeLinkPopup() {
+  markInteractionActive();
   popup.closePopup();
+}
+
+function bindRenderPerformanceEvents() {
+  document.addEventListener('visibilitychange', () => {
+    pageVisible = document.visibilityState !== 'hidden';
+
+    if (pageVisible) {
+      animationClock.getDelta();
+      lastFrameTime = 0;
+      markInteractionActive();
+      startAnimationLoop();
+    } else if (animationFrameId) {
+      cancelAnimationFrame(animationFrameId);
+      animationFrameId = 0;
+    }
+  });
+
+  ['pointerdown', 'pointermove', 'wheel', 'keydown', 'touchstart'].forEach((eventName) => {
+    window.addEventListener(eventName, markInteractionActive, { passive: true });
+  });
+}
+
+function startAnimationLoop() {
+  if (!pageVisible || animationFrameId) {
+    return;
+  }
+
+  animationFrameId = requestAnimationFrame(animate);
 }
 
 function getRenderPixelRatio() {
@@ -684,6 +723,7 @@ function initMapOverlay() {
 }
 
 function setView(view, options = {}) {
+  markInteractionActive();
   const previousView = currentView;
   const transitionMode = options.transitionMode || resolveCameraTransitionMode(previousView, view);
   currentView = view;
@@ -913,6 +953,7 @@ function resetToVillageView(options = {}) {
 }
 
 function triggerHouseFocus(house) {
+  markInteractionActive();
   clearTimeout(popupDelayTimer);
   closeLinkPopup();
 
@@ -931,6 +972,7 @@ function triggerHouseFocus(house) {
 
 function triggerVideoBillboardClick(billboard) {
   if (!billboard?.userData?.url) return;
+  markInteractionActive();
   clearTimeout(popupDelayTimer);
   closeLinkPopup();
 
@@ -947,6 +989,7 @@ function triggerVideoBillboardClick(billboard) {
 
 function triggerPlotFocus(plot) {
   if (!plot) return;
+  markInteractionActive();
   clearTimeout(popupDelayTimer);
   closeLinkPopup();
 
@@ -1153,8 +1196,24 @@ function updateHouseScales() {
   });
 }
 
-function animate() {
-  requestAnimationFrame(animate);
+function animate(timestamp) {
+  animationFrameId = 0;
+  if (!pageVisible) {
+    return;
+  }
+
+  const frameInterval = shouldUseActiveFrameRate(timestamp)
+    ? ACTIVE_FRAME_INTERVAL
+    : IDLE_FRAME_INTERVAL;
+
+  if (lastFrameTime && timestamp - lastFrameTime < frameInterval) {
+    startAnimationLoop();
+    return;
+  }
+
+  lastFrameTime = timestamp;
+  startAnimationLoop();
+
   const deltaTime = animationClock.getDelta();
 
   timeOfDay.update();
@@ -1192,6 +1251,11 @@ function animate() {
     actors: characterActors,
     deltaTime
   });
+  updateVideoBillboardPlayback({
+    billboards: videoBillboardTargets,
+    pageVisible,
+    currentView
+  });
   updateWorldReveal(particleFormationProgress);
   updateFocusPopup();
 
@@ -1199,6 +1263,19 @@ function animate() {
   updatePopupAnchor();
   updateMapLabels();
   renderer.render(scene, camera);
+}
+
+function shouldUseActiveFrameRate(timestamp) {
+  return introActive
+    || cameraTransition.active
+    || getParticleFormationProgress(getParticleFormationElapsed()) < 1
+    || popup.isOpen()
+    || currentView === 'map'
+    || timestamp - lastInteractionAt < INTERACTION_ACTIVE_WINDOW;
+}
+
+function markInteractionActive() {
+  lastInteractionAt = performance.now();
 }
 
 function getParticleFormationElapsed() {

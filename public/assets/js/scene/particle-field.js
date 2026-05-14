@@ -131,12 +131,15 @@ export function createParticleField(scene) {
   points.frustumCulled = false;
   points.renderOrder = 4;
   scene.add(points);
+  let completed = false;
 
   return {
     setFormationSubjects(subjects) {
       const sampledTargets = sampleTargetData(subjects, count);
       if (!sampledTargets) return;
 
+      completed = false;
+      points.visible = true;
       geometry.attributes.aTarget.array.set(sampledTargets.targets);
       geometry.attributes.aColor.array.set(sampledTargets.colors);
       geometry.attributes.aTarget.needsUpdate = true;
@@ -150,11 +153,25 @@ export function createParticleField(scene) {
       viewTransitionProgress = 0,
       pixelRatio = window.devicePixelRatio || 1
     }) {
+      if (completed) {
+        return;
+      }
+
       const mapFade = THREE.MathUtils.lerp(1, MAP_OPACITY_MULTIPLIER, viewTransitionProgress);
       const introBoost = introActive ? INTRO_OPACITY_BOOST : 1;
       const settleFade = introActive ? 1 : 1 - THREE.MathUtils.smoothstep(formationProgress, PARTICLE_SETTLE_FADE_START, 1);
+      const opacity = BASE_OPACITY * mapFade * introBoost * settleFade;
+
+      if (!introActive && formationProgress >= 1 && opacity <= 0.001) {
+        completed = true;
+        points.visible = false;
+        material.uniforms.uOpacity.value = 0;
+        return;
+      }
+
+      points.visible = opacity > 0.001;
       material.uniforms.uTime.value = elapsedTime;
-      material.uniforms.uOpacity.value = BASE_OPACITY * mapFade * introBoost * settleFade;
+      material.uniforms.uOpacity.value = opacity;
       material.uniforms.uPixelRatio.value = Math.min(pixelRatio, 1.8);
       material.uniforms.uDriftStrength.value = THREE.MathUtils.lerp(1, 0.42, viewTransitionProgress);
       material.uniforms.uFormationProgress.value = introActive ? 0 : formationProgress;
