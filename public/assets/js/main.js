@@ -40,6 +40,7 @@ const INTRO_TRANSITION_DURATION = 3800;
 const PARTICLE_FORMATION_DURATION = 4000;
 const PARTICLE_WORLD_REVEAL_START = 0.76;
 const PARTICLE_WORLD_REVEAL_END = 1;
+const INTRO_GROUND_PREVIEW_OPACITY = 0.14;
 const FOG_NEAR = 28;
 const FOG_FAR = 70;
 const MAP_FOG_NEAR = 60;
@@ -1222,17 +1223,17 @@ function updateWorldReveal(formationProgress) {
     );
 
   [
-    ground,
-    villageGroup,
-    mapOverlayGroup,
-    sceneryGroup,
-    landPlotGroup,
-    videoBillboardGroup
-  ].filter(Boolean).forEach((subject) => {
+    { subject: ground, opacity: Math.max(INTRO_GROUND_PREVIEW_OPACITY, revealOpacity) },
+    { subject: villageGroup, opacity: revealOpacity },
+    { subject: mapOverlayGroup, opacity: revealOpacity },
+    { subject: sceneryGroup, opacity: revealOpacity },
+    { subject: landPlotGroup, opacity: revealOpacity },
+    { subject: videoBillboardGroup, opacity: revealOpacity }
+  ].filter(({ subject }) => Boolean(subject)).forEach(({ subject, opacity }) => {
     subject.traverse?.((child) => {
       if ((!child.isMesh && !child.isLine && !child.isPoints) || !child.material) return;
       const materials = Array.isArray(child.material) ? child.material : [child.material];
-      materials.forEach((material) => applyRevealOpacity(material, revealOpacity));
+      materials.forEach((material) => applyRevealOpacity(material, opacity));
     });
   });
 }

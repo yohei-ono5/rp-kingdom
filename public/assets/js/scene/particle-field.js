@@ -2,12 +2,12 @@ import * as THREE from 'three';
 
 const PARTICLE_COUNT_DESKTOP = 5600;
 const PARTICLE_COUNT_MOBILE = 2200;
-const FIELD_RADIUS = 34;
-const FIELD_HEIGHT = 20;
 const BASE_OPACITY = 0.82;
 const MAP_OPACITY_MULTIPLIER = 0.18;
 const INTRO_OPACITY_BOOST = 1.18;
 const PARTICLE_SETTLE_FADE_START = 0.96;
+const DESCENT_START_HEIGHT = 64;
+const DESCENT_SPREAD_RADIUS = 38;
 
 const tempVector = new THREE.Vector3();
 const tempA = new THREE.Vector3();
@@ -29,15 +29,15 @@ export function createParticleField(scene) {
   const colors = new Float32Array(count * 3);
 
   for (let index = 0; index < count; index += 1) {
-    const radius = Math.sqrt(Math.random()) * FIELD_RADIUS;
+    const radius = Math.sqrt(Math.random()) * DESCENT_SPREAD_RADIUS;
     const angle = Math.random() * Math.PI * 2;
-    const heightBias = Math.random() ** 1.7;
+    const heightBias = Math.random() ** 0.82;
     const positionIndex = index * 3;
     const seedIndex = index * 4;
 
-    positions[positionIndex] = Math.cos(angle) * radius + THREE.MathUtils.randFloatSpread(3.2);
-    positions[positionIndex + 1] = 1.8 + heightBias * FIELD_HEIGHT;
-    positions[positionIndex + 2] = Math.sin(angle) * radius + THREE.MathUtils.randFloatSpread(3.2);
+    positions[positionIndex] = Math.cos(angle) * radius + THREE.MathUtils.randFloatSpread(8);
+    positions[positionIndex + 1] = 12 + heightBias * DESCENT_START_HEIGHT;
+    positions[positionIndex + 2] = Math.sin(angle) * radius - 18 + THREE.MathUtils.randFloatSpread(10);
 
     targets[positionIndex] = positions[positionIndex];
     targets[positionIndex + 1] = positions[positionIndex + 1];
@@ -84,14 +84,17 @@ export function createParticleField(scene) {
 
       void main() {
         float easedFormation = smoothstep(0.0, 1.0, uFormationProgress);
-        vec3 transformed = mix(position, aTarget, easedFormation);
+        float pullProgress = smoothstep(0.02, 0.82, uFormationProgress);
+        vec3 overshoot = normalize(aTarget - position + vec3(0.01, -0.18, 0.01)) * aSeed.z * 0.46 * (1.0 - easedFormation);
+        vec3 transformed = mix(position, aTarget + overshoot, pullProgress);
         float slowTime = uTime * aSeed.y + aSeed.x;
-        float verticalLoop = mod(position.y + uTime * (0.34 + aSeed.w * 0.46), ${FIELD_HEIGHT.toFixed(1)});
-        float driftFade = 1.0 - easedFormation * 0.78;
+        float verticalLoop = mod(position.y + uTime * (0.34 + aSeed.w * 0.46), ${DESCENT_START_HEIGHT.toFixed(1)});
+        float driftFade = 1.0 - easedFormation * 0.88;
+        float fallingTrail = (1.0 - pullProgress) * (1.0 - smoothstep(0.72, 1.0, uFormationProgress));
 
         transformed.x += sin(slowTime * 0.74 + position.z * 0.12) * aSeed.z * uDriftStrength * driftFade;
         transformed.z += cos(slowTime * 0.63 + position.x * 0.1) * aSeed.z * 0.72 * uDriftStrength * driftFade;
-        transformed.y = mix(1.6 + verticalLoop, transformed.y, easedFormation);
+        transformed.y += fallingTrail * sin(slowTime * 0.42) * 1.4;
         transformed.y += sin(slowTime * 1.5) * 0.08 * easedFormation;
 
         vec4 modelViewPosition = modelViewMatrix * vec4(transformed, 1.0);
@@ -99,7 +102,7 @@ export function createParticleField(scene) {
         gl_PointSize = aSize * uPixelRatio * (34.0 / max(8.0, -modelViewPosition.z));
 
         vColor = aColor;
-        vAlpha = smoothstep(0.0, 3.6, verticalLoop) * (1.0 - smoothstep(${(FIELD_HEIGHT - 2.6).toFixed(1)}, ${FIELD_HEIGHT.toFixed(1)}, verticalLoop));
+        vAlpha = 0.72 + 0.28 * smoothstep(0.0, 1.0, pullProgress);
       }
     `,
     fragmentShader: `
