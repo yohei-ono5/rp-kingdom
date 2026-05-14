@@ -1,13 +1,13 @@
 import * as THREE from 'three';
 
-const PARTICLE_COUNT_DESKTOP = 2200;
-const PARTICLE_COUNT_MOBILE = 920;
+const PARTICLE_COUNT_DESKTOP = 5600;
+const PARTICLE_COUNT_MOBILE = 2200;
 const FIELD_RADIUS = 34;
 const FIELD_HEIGHT = 20;
 const BASE_OPACITY = 0.82;
 const MAP_OPACITY_MULTIPLIER = 0.18;
 const INTRO_OPACITY_BOOST = 1.18;
-const PARTICLE_SETTLE_FADE_START = 0.78;
+const PARTICLE_SETTLE_FADE_START = 0.96;
 
 const tempVector = new THREE.Vector3();
 const tempA = new THREE.Vector3();
@@ -15,6 +15,8 @@ const tempB = new THREE.Vector3();
 const tempC = new THREE.Vector3();
 const tempUv = new THREE.Vector2();
 const fallbackParticleColor = new THREE.Color(0xd9f5ff);
+const pastelLiftColor = new THREE.Color(0xf3fbff);
+const pastelCoolTint = new THREE.Color(0xcfeeff);
 const textureCanvasCache = new WeakMap();
 
 export function createParticleField(scene) {
@@ -166,13 +168,16 @@ function sampleTargetData(subjects, count) {
 
   subjects
     .filter(Boolean)
-    .forEach((subject) => {
+    .forEach((entry) => {
+      const subject = entry?.subject || entry;
+      const subjectWeight = entry?.weight ?? 1;
+      if (!subject) return;
       subject.updateWorldMatrix(true, true);
       subject.traverse((child) => {
         const position = child.geometry?.attributes?.position;
         if (!child.isMesh || !position?.count) return;
 
-        const meshData = buildMeshSampler(child, position);
+        const meshData = buildMeshSampler(child, position, subjectWeight);
         if (!meshData) return;
 
         meshes.push({
@@ -220,7 +225,7 @@ function pickWeightedMesh(meshes, totalWeight) {
   return meshes[meshes.length - 1];
 }
 
-function buildMeshSampler(mesh, position) {
+function buildMeshSampler(mesh, position, subjectWeight = 1) {
   const index = mesh.geometry.index;
   const uv = mesh.geometry.attributes.uv;
   const triangleCount = index ? Math.floor(index.count / 3) : Math.floor(position.count / 3);
@@ -249,7 +254,7 @@ function buildMeshSampler(mesh, position) {
     cumulativeAreas,
     totalArea,
     uv,
-    weight: Math.max(1, Math.pow(totalArea, 0.58))
+    weight: Math.max(0.0001, Math.pow(totalArea, 0.58) * subjectWeight)
   };
 }
 
@@ -316,7 +321,7 @@ function getMaterialSampleColor(materialInput, uv) {
   const textureColor = sampleTextureColor(material?.map, uv);
 
   if (textureColor) {
-    return textureColor;
+    return toPastelParticleColor(textureColor);
   }
 
   const color = material?.color?.clone?.() || fallbackParticleColor.clone();
@@ -324,7 +329,21 @@ function getMaterialSampleColor(materialInput, uv) {
     color.lerp(material.emissive, 0.35);
   }
 
-  return color;
+  return toPastelParticleColor(color);
+}
+
+function toPastelParticleColor(color) {
+  const pastelColor = color.clone();
+  const hsl = { h: 0, s: 0, l: 0 };
+  pastelColor.getHSL(hsl);
+
+  hsl.s = THREE.MathUtils.clamp(hsl.s * 0.38, 0.12, 0.34);
+  hsl.l = THREE.MathUtils.clamp(hsl.l * 0.52 + 0.46, 0.64, 0.86);
+  pastelColor.setHSL(hsl.h, hsl.s, hsl.l);
+  pastelColor.lerp(pastelCoolTint, 0.16);
+  pastelColor.lerp(pastelLiftColor, 0.22);
+
+  return pastelColor;
 }
 
 function sampleTextureColor(texture, uv) {

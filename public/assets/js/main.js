@@ -36,9 +36,9 @@ const DRAG_THRESHOLD = 6;
 const CAMERA_TRANSITION_DURATION = 1800;
 const MAP_PULLBACK_DISTANCE = 5.5;
 const MAP_PULLBACK_HEIGHT = 3.8;
-const INTRO_TRANSITION_DURATION = 2600;
-const PARTICLE_FORMATION_DURATION = 3200;
-const PARTICLE_WORLD_REVEAL_START = 0.28;
+const INTRO_TRANSITION_DURATION = 3800;
+const PARTICLE_FORMATION_DURATION = 4000;
+const PARTICLE_WORLD_REVEAL_START = 0.76;
 const PARTICLE_WORLD_REVEAL_END = 1;
 const FOG_NEAR = 28;
 const FOG_FAR = 70;
@@ -604,11 +604,11 @@ function startIntroExperience() {
 
 function refreshParticleFormationTargets() {
   particleField.setFormationSubjects([
-    ground,
-    villageGroup,
-    landPlotGroup,
-    videoBillboardGroup,
-    sceneryGroup
+    { subject: villageGroup, weight: 3.6 },
+    { subject: videoBillboardGroup, weight: 1.5 },
+    { subject: landPlotGroup, weight: 0.65 },
+    { subject: sceneryGroup, weight: 0.28 },
+    { subject: ground, weight: 0.08 }
   ]);
 }
 
@@ -1180,7 +1180,6 @@ function animate() {
     viewTransitionProgress: viewTransition.progress,
     pixelRatio: renderer.getPixelRatio()
   });
-  updateWorldReveal(particleFormationProgress);
   updateHouseScales();
   updateLandPlots({
     landPlotMeta,
@@ -1192,6 +1191,7 @@ function animate() {
     actors: characterActors,
     deltaTime
   });
+  updateWorldReveal(particleFormationProgress);
   updateFocusPopup();
 
   controls.update();
@@ -1230,7 +1230,7 @@ function updateWorldReveal(formationProgress) {
     videoBillboardGroup
   ].filter(Boolean).forEach((subject) => {
     subject.traverse?.((child) => {
-      if (!child.isMesh || !child.material) return;
+      if ((!child.isMesh && !child.isLine && !child.isPoints) || !child.material) return;
       const materials = Array.isArray(child.material) ? child.material : [child.material];
       materials.forEach((material) => applyRevealOpacity(material, revealOpacity));
     });
