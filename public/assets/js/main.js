@@ -23,6 +23,7 @@ import { initLandPlots, updateLandPlotLanguage, updateLandPlots } from './scene/
 import { createTreeExclusions, initTrees } from './scene/trees.js';
 import { initVideoBillboards } from './scene/video-billboards.js';
 import { createSkyObjects } from './scene/sky-objects.js';
+import { createParticleField } from './scene/particle-field.js';
 import { createSceneInteractionController } from './interaction/scene-interactions.js';
 import { createTimeOfDayController } from './systems/time-of-day.js';
 import { createLinkPopup } from './ui/link-popup.js';
@@ -36,6 +37,9 @@ const CAMERA_TRANSITION_DURATION = 1800;
 const MAP_PULLBACK_DISTANCE = 5.5;
 const MAP_PULLBACK_HEIGHT = 3.8;
 const INTRO_TRANSITION_DURATION = 2600;
+const PARTICLE_FORMATION_DURATION = 3200;
+const PARTICLE_WORLD_REVEAL_START = 0.28;
+const PARTICLE_WORLD_REVEAL_END = 1;
 const FOG_NEAR = 28;
 const FOG_FAR = 70;
 const MAP_FOG_NEAR = 60;
@@ -154,6 +158,7 @@ const videoBillboardTargets = [];
 const characterActors = [];
 const characterMixers = [];
 const animationClock = new THREE.Clock();
+const revealMaterialStates = new WeakMap();
 
 const ui = {
   introOverlay: document.getElementById('intro-overlay'),
@@ -193,6 +198,7 @@ let currentFocusBillboard = null;
 let currentFocusPlot = null;
 let popupDelayTimer = 0;
 let introActive = true;
+let particleFormationStartedAt = 0;
 const BILLBOARD_FOCUS_DISTANCE = 5.5;
 const BILLBOARD_FOCUS_FRAME_PADDING = 1.18;
 
@@ -238,6 +244,7 @@ const timeOfDay = createTimeOfDayController({
 });
 const timeOfDayState = timeOfDay.state;
 const skyObjects = createSkyObjects(scene);
+const particleField = createParticleField(scene);
 
 const popup = createLinkPopup({
   onResetFocus: () => resetToVillageView({ skipPopupClose: true }),
@@ -537,6 +544,7 @@ try {
 } catch (error) {
   console.error('Failed to initialize video billboards.', error);
 }
+refreshParticleFormationTargets();
 void initCharacters({
   characters: CHARACTERS,
   parentGroup: sceneryGroup,
@@ -572,6 +580,7 @@ void loadWorldObjects({
 }).then(() => {
   updateWorldObjectTranslations();
   rebuildMapLabels();
+  refreshParticleFormationTargets();
 });
 interaction.bindEvents();
 bindLanguageEvents();
@@ -586,10 +595,21 @@ function startIntroExperience() {
   }
 
   introActive = false;
+  particleFormationStartedAt = performance.now();
   document.body.classList.remove('intro-active');
   ui.introOverlay?.classList.add('is-hidden');
   ui.introOverlay?.setAttribute('aria-hidden', 'true');
   resetToVillageView({ transitionMode: 'intro-enter' });
+}
+
+function refreshParticleFormationTargets() {
+  particleField.setFormationSubjects([
+    ground,
+    villageGroup,
+    landPlotGroup,
+    videoBillboardGroup,
+    sceneryGroup
+  ]);
 }
 
 function openLinkPopup(name, destination) {
@@ -1146,11 +1166,21 @@ function animate() {
   }
 
   updateViewTransition();
+  const particleFormationElapsed = getParticleFormationElapsed();
+  const particleFormationProgress = getParticleFormationProgress(particleFormationElapsed);
   skyObjects.update({
     timeOfDayState,
     camera,
     viewTransitionProgress: viewTransition.progress
   });
+  particleField.update({
+    elapsedTime: animationClock.elapsedTime,
+    introActive,
+    formationProgress: particleFormationProgress,
+    viewTransitionProgress: viewTransition.progress,
+    pixelRatio: renderer.getPixelRatio()
+  });
+  updateWorldReveal(particleFormationProgress);
   updateHouseScales();
   updateLandPlots({
     landPlotMeta,
@@ -1168,4 +1198,77 @@ function animate() {
   updatePopupAnchor();
   updateMapLabels();
   renderer.render(scene, camera);
+}
+
+function getParticleFormationElapsed() {
+  if (introActive || particleFormationStartedAt <= 0) {
+    return 0;
+  }
+
+  return performance.now() - particleFormationStartedAt;
+}
+
+function getParticleFormationProgress(elapsed) {
+  return THREE.MathUtils.clamp(elapsed / PARTICLE_FORMATION_DURATION, 0, 1);
+}
+
+function updateWorldReveal(formationProgress) {
+  const revealOpacity = introActive
+    ? 0
+    : THREE.MathUtils.smoothstep(
+      formationProgress,
+      PARTICLE_WORLD_REVEAL_START,
+      PARTICLE_WORLD_REVEAL_END
+    );
+
+  [
+    ground,
+    villageGroup,
+    mapOverlayGroup,
+    sceneryGroup,
+    landPlotGroup,
+    videoBillboardGroup
+  ].filter(Boolean).forEach((subject) => {
+    subject.traverse?.((child) => {
+      if (!child.isMesh || !child.material) return;
+      const materials = Array.isArray(child.material) ? child.material : [child.material];
+      materials.forEach((material) => applyRevealOpacity(material, revealOpacity));
+    });
+  });
+}
+
+function applyRevealOpacity(material, revealOpacity) {
+  if (!revealMaterialStates.has(material)) {
+    revealMaterialStates.set(material, {
+      transparent: material.transparent,
+      opacity: Number.isFinite(material.opacity) ? material.opacity : 1,
+      depthWrite: material.depthWrite,
+      alphaHash: material.alphaHash,
+      alphaTest: material.alphaTest
+    });
+  }
+
+  const original = revealMaterialStates.get(material);
+
+  let needsUpdate = false;
+  if ('alphaHash' in material && !original.transparent) {
+    needsUpdate = setMaterialFlag(material, 'transparent', false) || needsUpdate;
+    needsUpdate = setMaterialFlag(material, 'alphaHash', true) || needsUpdate;
+    needsUpdate = setMaterialFlag(material, 'depthWrite', original.depthWrite) || needsUpdate;
+  } else {
+    needsUpdate = setMaterialFlag(material, 'transparent', true) || needsUpdate;
+    needsUpdate = setMaterialFlag(material, 'depthWrite', false) || needsUpdate;
+  }
+
+  material.opacity = original.opacity * revealOpacity;
+  if (needsUpdate) material.needsUpdate = true;
+}
+
+function setMaterialFlag(material, property, value) {
+  if (material[property] === value) {
+    return false;
+  }
+
+  material[property] = value;
+  return true;
 }
