@@ -128,12 +128,12 @@ const desiredTarget = controls.target.clone();
 
 const backgroundColors = {
   village: new THREE.Color(0x1a1a2e),
-  map: new THREE.Color(0x1a1a2e)
+  map: new THREE.Color(0x315f3d)
 };
 
 const fogColors = {
   village: new THREE.Color(0x24283d),
-  map: new THREE.Color(0x202534)
+  map: new THREE.Color(0x315f3d)
 };
 
 const mapGroundColor = new THREE.Color(0x3b7852);
@@ -706,7 +706,7 @@ function initLights() {
 
 function initGround() {
   ground = new THREE.Mesh(
-    new THREE.PlaneGeometry(70, 70),
+    new THREE.PlaneGeometry(220, 220),
     new THREE.MeshStandardMaterial({
       color: 0x2f6b3b,
       roughness: 0.96,
@@ -1042,8 +1042,8 @@ function updateViewTransition() {
   const targetProgress = currentView === 'map' ? 1 : 0;
   viewTransition.progress += (targetProgress - viewTransition.progress) * VIEW_BLEND_SPEED;
 
-  renderSkyColor.copy(timeOfDayState.sky).lerp(backgroundColors.map, viewTransition.progress * 0.35);
-  renderFogColor.copy(timeOfDayState.fog).lerp(fogColors.map, viewTransition.progress * 0.42);
+  renderSkyColor.copy(timeOfDayState.sky).lerp(backgroundColors.map, viewTransition.progress);
+  renderFogColor.copy(timeOfDayState.fog).lerp(fogColors.map, viewTransition.progress);
   scene.background.lerp(renderSkyColor, 0.045);
   scene.fog.color.lerp(renderFogColor, 0.045);
 
