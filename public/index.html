@@ -610,35 +610,12 @@
       text-shadow: 0 8px 24px rgba(255, 255, 255, 0.42);
     }
 
-    .intro-mark {
+    .intro-logo {
       width: 118px;
       height: 118px;
-      display: grid;
-      place-items: center;
-      background: #2d57a5;
-      color: #ffffff;
+      display: block;
+      object-fit: contain;
       box-shadow: 0 24px 48px rgba(55, 92, 148, 0.16);
-    }
-
-    .intro-mark-inner {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 6px;
-      transform: translateY(-2px);
-    }
-
-    .intro-crown {
-      font-size: 30px;
-      line-height: 1;
-      letter-spacing: 0;
-    }
-
-    .intro-mark-copy {
-      font-size: 10px;
-      line-height: 1.2;
-      letter-spacing: 0.16em;
-      white-space: pre-line;
     }
 
     .intro-title {
@@ -870,7 +847,7 @@
         padding: 0 24px;
       }
 
-      .intro-mark {
+      .intro-logo {
         width: 100px;
         height: 100px;
       }
@@ -894,13 +871,7 @@
 <body>
   <div id="intro-overlay" aria-hidden="false">
     <div class="intro-panel">
-      <div class="intro-mark">
-        <div class="intro-mark-inner">
-          <div class="intro-crown">♕</div>
-          <div class="intro-mark-copy">THE CROWN
-PRODUCTION</div>
-        </div>
-      </div>
+      <img class="intro-logo" src="./assets/image/intro-logo.jpg" alt="The Crown Production">
       <div class="intro-title">The Crown Production</div>
       <button class="intro-enter" id="intro-enter" type="button">Enter</button>
       <div class="intro-hint">Press Enter</div>

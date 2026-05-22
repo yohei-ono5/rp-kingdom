@@ -53,12 +53,6 @@ const translations = {
         price: 'お問い合わせください',
         description: '村の入口に近い目立つ区画'
       },
-      'A-02': {
-        title: '分譲地',
-        status: 'FOR SALE',
-        price: 'スポンサー枠',
-        description: 'MAPビューでも見つけやすい角地'
-      },
       'B-01': {
         title: '広告枠募集中',
         status: 'FOR SALE',
@@ -107,12 +101,6 @@ const translations = {
         status: 'FOR SALE',
         price: 'Contact us',
         description: 'A highly visible plot near the village entrance'
-      },
-      'A-02': {
-        title: 'Available Plot',
-        status: 'FOR SALE',
-        price: 'Sponsor slot',
-        description: 'A corner plot that is easy to find in MAP view'
       },
       'B-01': {
         title: 'Ad Space Available',
@@ -163,12 +151,6 @@ const translations = {
         price: '문의해 주세요',
         description: '마을 입구와 가까운 눈에 잘 띄는 구역'
       },
-      'A-02': {
-        title: '분양지',
-        status: 'FOR SALE',
-        price: '스폰서 구역',
-        description: 'MAP 보기에서도 찾기 쉬운 코너 구역'
-      },
       'B-01': {
         title: '광고 공간 모집 중',
         status: 'FOR SALE',
@@ -218,12 +200,6 @@ const translations = {
         price: 'Nous contacter',
         description: 'Un emplacement très visible près de l’entrée du village'
       },
-      'A-02': {
-        title: 'Terrain disponible',
-        status: 'FOR SALE',
-        price: 'Emplacement sponsor',
-        description: 'Un angle facile à trouver dans la vue MAP'
-      },
       'B-01': {
         title: 'Espace publicitaire',
         status: 'FOR SALE',
@@ -272,12 +248,6 @@ const translations = {
         status: 'FOR SALE',
         price: '請洽詢',
         description: '靠近村莊入口、容易看見的地塊'
-      },
-      'A-02': {
-        title: '可用地塊',
-        status: 'FOR SALE',
-        price: '贊助欄位',
-        description: '在 MAP 視角也容易找到的角落地塊'
       },
       'B-01': {
         title: '廣告欄位招募中',

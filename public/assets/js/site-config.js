@@ -3,6 +3,7 @@ const ARTIST_HOUSE_MODEL_URL = new URL('../models/Fantasy_House.glb', import.met
 const TREE_MODEL_URL = new URL('../models/tree_LOD0.glb', import.meta.url).href;
 const YOUTUBE_PROMO_VIDEO_URL = 'https://pub-8c47d9817fce4e86a82d02fad188f8e8.r2.dev/youtube-promo.mp4';
 const CHARACTER_MODEL_URL = 'https://pub-8c47d9817fce4e86a82d02fad188f8e8.r2.dev/3D_object/character.glb';
+const WINDMILL_MODEL_URL = 'https://pub-8c47d9817fce4e86a82d02fad188f8e8.r2.dev/3D_object/windmill.glb';
 
 export const HOUSE_DESTINATIONS = [
   {
@@ -39,12 +40,13 @@ export const HOUSE_DESTINATIONS = [
   {
     id: 'sns',
     url: 'https://www.instagram.com/rujie.official/',
-    modelUrl: STANDARD_HOUSE_MODEL_URL,
+    modelUrl: WINDMILL_MODEL_URL,
     position: [-20.4, 0, 6.0],
-    scale: 0.99,
+    scale: 8.6,
     rotationY: -0.18,
-    doorOffset: [0.08, 0, 0.92],
-    doorFacing: [0, 0, 1]
+    doorOffset: [0, 0, -0.5],
+    doorFacing: [0, 0, -1],
+    clearRadius: 5.4
   },
   {
     id: 'store',
@@ -65,8 +67,8 @@ export const FRONT_HOUSE_DESTINATION = {
   position: [9.8, 0, 8.6],
   scale: 0.76,
   rotationY: -0.18,
-  doorOffset: [0.48, 0, 0.58],
-  doorFacing: [0, 0, 1]
+  doorOffset: [-1.1, 0, 0.1],
+  doorFacing: [-1, 0, 0]
 };
 
 export const VIDEO_BILLBOARDS = [
@@ -120,6 +122,22 @@ export const TREE_SCATTER = {
   exclusionPadding: 1.7
 };
 
+export const WEST_TREE_SCATTER = {
+  modelUrl: TREE_MODEL_URL,
+  count: 18,
+  seed: 20260522,
+  bounds: {
+    minX: -33,
+    maxX: -18,
+    minZ: -6,
+    maxZ: 18
+  },
+  centerClearRadius: 0,
+  scaleRange: [0.6, 1.05],
+  minDistance: 2.4,
+  exclusionPadding: 1.9
+};
+
 export const LAND_PLOTS = [
   {
     id: 'A-01',
@@ -128,14 +146,6 @@ export const LAND_PLOTS = [
     width: 4.8,
     depth: 4.2,
     rotationY: 0.18
-  },
-  {
-    id: 'A-02',
-    size: '4.2m x 4.6m',
-    position: [13.4, 0, 2.8],
-    width: 4.2,
-    depth: 4.6,
-    rotationY: -0.14
   },
   {
     id: 'B-01',
