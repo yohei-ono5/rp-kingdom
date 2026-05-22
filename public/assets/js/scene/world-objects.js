@@ -29,34 +29,42 @@ export async function loadWorldObjects({
   const loader = new GLTFLoader();
   const templateCache = new Map();
 
-  for (const data of objects) {
+  const loadTemplate = (url) => {
+    const cached = templateCache.get(url);
+    if (cached) {
+      return cached;
+    }
+
+    const request = loadModelTemplate(loader, url, houseMaterials).then((template) => {
+      templateCache.set(url, template);
+      return template;
+    });
+
+    templateCache.set(url, request);
+    return request;
+  };
+
+  await Promise.all(objects.map(async (data) => {
     if (!data.modelUrl) {
       console.error(`Missing modelUrl for object "${data.id}".`);
-      continue;
+      return;
     }
 
-    let template = templateCache.get(data.modelUrl);
-
-    if (!template) {
-      try {
-        template = await loadModelTemplate(loader, data.modelUrl, houseMaterials);
-        templateCache.set(data.modelUrl, template);
-      } catch (error) {
-        console.error(`Failed to load model for object "${data.id}".`, error);
-        continue;
-      }
+    try {
+      const template = await loadTemplate(data.modelUrl);
+      addWorldObject({
+        template,
+        data,
+        villageGroup,
+        mapOverlayGroup,
+        overlayMaterials,
+        mapMarkerMeta,
+        houseLights
+      });
+    } catch (error) {
+      console.error(`Failed to load model for object "${data.id}".`, error);
     }
-
-    addWorldObject({
-      template,
-      data,
-      villageGroup,
-      mapOverlayGroup,
-      overlayMaterials,
-      mapMarkerMeta,
-      houseLights
-    });
-  }
+  }));
 }
 
 function addWorldObject({

@@ -36,6 +36,7 @@ Three.js を使った絵本風 3D 村の試作です。`public/assets/models/Fan
 - `ENTER` 後は上空から降る粒子が家・看板・地面へ集まって世界を形作り、地面だけを薄く先行表示して降下時の距離感を補助
 - 村の空きスペースに `FOR SALE` 看板付きの売地/広告枠区画を配置（境界線、杭、看板、立て札の3Dオブジェクト）。Artist 北側にあった `A-02` 区画は削除済み
 - HOME 視点での奥行きを出すため、既存の北側林に加えて西側にも追加ツリー散布（`WEST_TREE_SCATTER`）を設定
+- 建物モデルは URL ごとにキャッシュしつつ並列読み込みするため、重いモデルがあっても他の建物の表示開始を待たせにくい
 - R2 上の `character.glb` を村の中央付近に配置し、GLBに含まれる歩行アニメーションを使って、端から端へ歩くNPC風の移動を実行。端に着くとランダムな時間だけ止まり、反対側へ戻る。建物・売地・看板には簡易障害物判定を付け、ぶつかりそうな場合は方向転換する
 - 売地/広告枠区画にホバーすると、区画名、価格、サイズ、説明をカーソル近くのパネルに表示し、区画が少し浮き上がる。クリックすると区画中心へズーム
 - 村ビューでは建物ホバー時にツールチップで建物名を表示、建物が僅かに拡大
@@ -70,7 +71,7 @@ python3 -m http.server 5500
 - `public/assets/js/camera/focus-camera.js`: ドア基点のフォーカスカメラ算出、ワールド→スクリーン投影
 - `public/assets/js/camera/transition-paths.js`: `intro-enter` / `map-enter` / `map-exit` のベジェ軌道生成
 - `public/assets/js/interaction/scene-interactions.js`: ポインタ/ホバー/クリック処理、ツールチップと売地パネルの出し分け、ナビボタン → 建物 or 看板の振り分け
-- `public/assets/js/scene/world-objects.js`: GLB 読み込み、マテリアル補正、建物配置、MAP 用マーカー生成
+- `public/assets/js/scene/world-objects.js`: GLB 読み込み、モデル URL ごとのキャッシュ、並列読み込み、マテリアル補正、建物配置、MAP 用マーカー生成
 - `public/assets/js/scene/characters.js`: キャラクターGLBの読み込み、高さ正規化、地面合わせ、アニメーション再生、NPC風の往復移動、簡易障害物回避
 - `public/assets/js/scene/land-plots.js`: 売地/広告枠区画の3D生成とホバー/MAP 遷移の更新処理
 - `public/assets/js/scene/video-billboards.js`: 動画看板の3D生成（フレーム + スクリーン + 支柱）、`VideoTexture` 管理、autoplay フォールバック、村ビュー/MAP/タブ状態に応じた再生制御
