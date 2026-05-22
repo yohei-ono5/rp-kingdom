@@ -8,6 +8,12 @@ const DEFAULT_BOUNDS = Object.freeze({
   maxZ: 24
 });
 
+const tempMatrix = new THREE.Matrix4();
+const tempPosition = new THREE.Vector3();
+const tempQuaternion = new THREE.Quaternion();
+const tempEuler = new THREE.Euler();
+const tempScale = new THREE.Vector3();
+
 export async function initTrees({
   treeConfig,
   parentGroup,
@@ -27,15 +33,54 @@ export async function initTrees({
     exclusions
   });
 
-  placements.forEach((placement) => {
-    const tree = model.clone(true);
-    tree.position.set(placement.x, 0, placement.z);
-    tree.rotation.y = placement.rotationY;
-    tree.scale.setScalar(placement.scale);
-    parentGroup.add(tree);
+  addInstancedTrees({
+    model,
+    placements,
+    parentGroup
   });
 
   return placements;
+}
+
+function addInstancedTrees({
+  model,
+  placements,
+  parentGroup
+}) {
+  if (!placements.length) return;
+
+  const sourceMeshes = [];
+  model.updateMatrixWorld(true);
+  model.traverse((child) => {
+    if (child.isMesh) {
+      sourceMeshes.push(child);
+    }
+  });
+
+  sourceMeshes.forEach((sourceMesh) => {
+    const instancedMesh = new THREE.InstancedMesh(
+      sourceMesh.geometry,
+      sourceMesh.material,
+      placements.length
+    );
+
+    instancedMesh.castShadow = sourceMesh.castShadow;
+    instancedMesh.receiveShadow = sourceMesh.receiveShadow;
+    instancedMesh.frustumCulled = false;
+
+    placements.forEach((placement, index) => {
+      tempPosition.set(placement.x, 0, placement.z);
+      tempEuler.set(0, placement.rotationY, 0);
+      tempQuaternion.setFromEuler(tempEuler);
+      tempScale.setScalar(placement.scale);
+      tempMatrix.compose(tempPosition, tempQuaternion, tempScale);
+      tempMatrix.multiply(sourceMesh.matrixWorld);
+      instancedMesh.setMatrixAt(index, tempMatrix);
+    });
+
+    instancedMesh.instanceMatrix.needsUpdate = true;
+    parentGroup.add(instancedMesh);
+  });
 }
 
 export function createTreeExclusions({

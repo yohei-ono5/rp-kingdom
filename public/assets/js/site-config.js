@@ -67,8 +67,8 @@ export const FRONT_HOUSE_DESTINATION = {
   position: [9.8, 0, 8.6],
   scale: 0.76,
   rotationY: -0.18,
-  doorOffset: [-1.1, 0, 0.1],
-  doorFacing: [-1, 0, 0]
+  doorOffset: [-0.5, 0, 0.1],
+  doorFacing: [-1, 0, 0.65]
 };
 
 export const VIDEO_BILLBOARDS = [
@@ -76,7 +76,7 @@ export const VIDEO_BILLBOARDS = [
     id: 'youtube',
     url: 'https://www.youtube.com/@Rujie-official',
     videoUrl: YOUTUBE_PROMO_VIDEO_URL,
-    position: [-12.0, 3.0, 13.0],
+    position: [-12.0, 3.0, 18.0],
     rotationY: 0,
     width: 4.0,
     height: 2.25
@@ -87,20 +87,21 @@ export const CHARACTERS = [
   {
     id: 'main-character',
     modelUrl: CHARACTER_MODEL_URL,
-    position: [1.4, 0, 4.2],
-    rotationY: -0.55,
-    height: 0.57,
+    position: [7.2, 0, 2.8],
+    rotationY: -0.2,
+    height: 0.82,
     animationIndex: 0,
     movement: {
       enabled: true,
       bounds: {
-        minX: -23,
-        maxX: 23,
+        minX: 2.0,
+        maxX: 8.4,
         minZ: 1.8,
-        maxZ: 8.2
+        maxZ: 4.4
       },
-      speedRange: [0.45, 0.76],
-      pauseRange: [1.4, 5.6],
+      axis: 'x',
+      speedRange: [0.38, 0.52],
+      pauseRange: [0.05, 0.25],
       facingOffset: -Math.PI / 2
     }
   }
@@ -154,13 +155,5 @@ export const LAND_PLOTS = [
     width: 4.6,
     depth: 4.0,
     rotationY: 0.05
-  },
-  {
-    id: 'B-02',
-    size: '4.4m x 4.4m',
-    position: [-4.5, 0, 13.8],
-    width: 4.4,
-    depth: 4.4,
-    rotationY: -0.08
   }
 ];

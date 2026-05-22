@@ -14,7 +14,7 @@
 - `public/assets/js/camera/focus-camera.js`: ドア基点のフォーカスカメラ計算、ドア位置のワールド座標取得、ワールド→スクリーン投影
 - `public/assets/js/camera/transition-paths.js`: `intro-enter` / `map-enter` / `map-exit` のベジェ軌道生成、遷移モード判定
 - `public/assets/js/interaction/scene-interactions.js`: ポインタ/ホバー/クリック、ドラッグ閾値、建物・売地・看板レイキャスト、ツールチップ/売地パネル表示制御、ナビボタン → 建物 or 看板の振り分け
-- `public/assets/js/scene/world-objects.js`: GLB 読み込み（モデル URL ごとにキャッシュ）、不透明マテリアル補正、建物配置、ナビボタン生成、MAP 用マーカー作成
+- `public/assets/js/scene/world-objects.js`: GLB 読み込み（モデル URL ごとにキャッシュし、並列で開始）、不透明マテリアル補正、建物配置、ナビボタン生成、MAP 用マーカー作成
 - `public/assets/js/scene/characters.js`: キャラクターGLBの読み込み、高さ正規化、地面合わせ、アニメーション再生、NPC風の往復移動、簡易障害物回避
 - `public/assets/js/scene/land-plots.js`: 売地/広告枠の 3D 生成（床・境界・杭・看板テクスチャ）とホバー/MAP 遷移更新
 - `public/assets/js/scene/video-billboards.js`: 動画看板の 3D 生成（フレーム + 動画スクリーン + 支柱を `Group` でまとめる）、`HTMLVideoElement` + `THREE.VideoTexture` + `MeshBasicMaterial` でライト非依存の自発光表示、autoplay 失敗時のジェスチャ・フォールバック、村ビュー/MAP/タブ状態に応じた再生制御
@@ -55,6 +55,7 @@
 - 動画看板は通常の村ビュー中のみ再生し、MAP 表示中やタブ非表示時は pause して `VideoTexture` のデコード/更新負荷を抑える
 - 売地/広告枠区画は `FOR SALE` 看板、境界線、杭で構成した 3D オブジェクトとして表示。Artist 北側にあった `A-02` は削除済み
 - HOME 視点の見栄えを補うため、北側の `TREE_SCATTER` に加えて西側に `WEST_TREE_SCATTER` を追加配置
+- 建物モデルは URL ごとにキャッシュしつつ並列で読み込むので、`windmill.glb` のような重いモデルが他の建物の表示開始をブロックしにくい
 - キャラクター（`CHARACTERS`）は R2 上の `character.glb` を使用し、高さを0.57に正規化して地面に接地。GLB内のルート移動を除去した歩行アニメーションを再生しつつ、サイト側で端から端へ歩かせる
 - キャラクターは端に着くとランダムな待機時間を挟んで反対側へ戻る。建物・売地・看板は簡易障害物として扱い、ぶつかりそうな場合は侵入せず方向転換する
 - PC では売地/広告枠区画ホバーで右下パネルに詳細を表示し、区画が僅かに浮き上がる

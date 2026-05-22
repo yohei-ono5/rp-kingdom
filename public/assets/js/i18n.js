@@ -58,12 +58,6 @@ const translations = {
         status: 'FOR SALE',
         price: '掲載相談可',
         description: 'SHOPエリア横の空きスペース'
-      },
-      'B-02': {
-        title: '分譲地',
-        status: 'FOR SALE',
-        price: 'お問い合わせください',
-        description: '広場に面したプロモーション区画'
       }
     }
   },
@@ -107,12 +101,6 @@ const translations = {
         status: 'FOR SALE',
         price: 'Listing available',
         description: 'Open space beside the SHOP area'
-      },
-      'B-02': {
-        title: 'Available Plot',
-        status: 'FOR SALE',
-        price: 'Contact us',
-        description: 'A promotion plot facing the village plaza'
       }
     }
   },
@@ -156,12 +144,6 @@ const translations = {
         status: 'FOR SALE',
         price: '게재 상담 가능',
         description: 'SHOP 구역 옆의 빈 공간'
-      },
-      'B-02': {
-        title: '분양지',
-        status: 'FOR SALE',
-        price: '문의해 주세요',
-        description: '광장을 마주한 프로모션 구역'
       }
     }
   },
@@ -205,12 +187,6 @@ const translations = {
         status: 'FOR SALE',
         price: 'Publication possible',
         description: 'Espace libre à côté de la zone SHOP'
-      },
-      'B-02': {
-        title: 'Terrain disponible',
-        status: 'FOR SALE',
-        price: 'Nous contacter',
-        description: 'Un emplacement promotionnel face à la place'
       }
     }
   },
@@ -254,12 +230,6 @@ const translations = {
         status: 'FOR SALE',
         price: '可洽談刊登',
         description: 'SHOP 區旁的空間'
-      },
-      'B-02': {
-        title: '可用地塊',
-        status: 'FOR SALE',
-        price: '請洽詢',
-        description: '面向廣場的推廣地塊'
       }
     }
   }

@@ -11,6 +11,7 @@ const DEFAULT_MOVEMENT_BOUNDS = Object.freeze({
 const DEFAULT_SPEED_RANGE = Object.freeze([0.45, 0.75]);
 const DEFAULT_PAUSE_RANGE = Object.freeze([1.2, 5.0]);
 const DEFAULT_OBSTACLE_RADIUS = 0.36;
+const ROTATION_BLEND_SPEED = 5.5;
 const ROOT_MOTION_NODE_NAMES = new Set(['Root', 'Armature']);
 
 export async function initCharacters({
@@ -36,6 +37,10 @@ export async function initCharacters({
       parentGroup.add(instance);
       actors.push(instance);
       instances.push(instance);
+      console.info(`Character "${character.id}" loaded.`, {
+        position: instance.position.toArray(),
+        actors: actors.length
+      });
     } catch (error) {
       console.error(`Failed to load character "${character.id}".`, error);
     }
@@ -135,14 +140,15 @@ function createNpcState(character, startPosition, obstacles) {
     ...DEFAULT_MOVEMENT_BOUNDS,
     ...(movement.bounds || {})
   };
-  const direction = startPosition.x > (bounds.minX + bounds.maxX) / 2 ? -1 : 1;
   const random = createSeededRandom(hashString(character.id || 'character'));
+  const axis = movement.axis === 'z' ? 'z' : 'x';
 
   const state = {
     bounds,
+    axis,
     random,
     status: 'walking',
-    direction,
+    direction: getInitialDirection(startPosition, bounds, axis),
     speed: pickRange(movement.speedRange || DEFAULT_SPEED_RANGE, random),
     speedRange: movement.speedRange || DEFAULT_SPEED_RANGE,
     pauseRange: movement.pauseRange || DEFAULT_PAUSE_RANGE,
@@ -155,7 +161,7 @@ function createNpcState(character, startPosition, obstacles) {
   state.target = pickWalkTarget({
     state,
     y: startPosition.y,
-    preferDirection: direction,
+    preferDirection: state.direction,
     currentPosition: startPosition
   });
 
@@ -195,7 +201,13 @@ function updateNpcMovement(actor, deltaTime) {
   }
 
   actor.position.copy(nextPosition);
-  actor.rotation.y = Math.atan2(direction.x, direction.z) + state.facingOffset;
+  const targetRotation = Math.atan2(direction.x, direction.z) + state.facingOffset;
+  actor.rotation.y += getShortestAngleDelta(actor.rotation.y, targetRotation)
+    * Math.min(1, deltaTime * ROTATION_BLEND_SPEED);
+
+  if (state.action) {
+    state.action.timeScale = THREE.MathUtils.clamp(state.speed / 0.58, 0.62, 0.92);
+  }
 }
 
 function beginNextWalk(actor, state) {
@@ -232,18 +244,26 @@ function pickWalkTarget({
   currentPosition,
   avoidCurrentLine = false
 }) {
-  const edgeX = preferDirection > 0 ? state.bounds.maxX : state.bounds.minX;
-  const fallbackZ = THREE.MathUtils.clamp(
-    currentPosition.z + (state.random() < 0.5 ? -1 : 1) * 2.2,
-    state.bounds.minZ,
-    state.bounds.maxZ
+  const walkAxis = state.axis || 'x';
+  const crossAxis = walkAxis === 'z' ? 'x' : 'z';
+  const targetEdge = preferDirection > 0
+    ? state.bounds[walkAxis === 'z' ? 'maxZ' : 'maxX']
+    : state.bounds[walkAxis === 'z' ? 'minZ' : 'minX'];
+  const crossMin = state.bounds[crossAxis === 'z' ? 'minZ' : 'minX'];
+  const crossMax = state.bounds[crossAxis === 'z' ? 'maxZ' : 'maxX'];
+  const fallbackCross = THREE.MathUtils.clamp(
+    currentPosition[crossAxis] + (state.random() < 0.5 ? -1 : 1) * 2.2,
+    crossMin,
+    crossMax
   );
 
   for (let attempt = 0; attempt < 12; attempt += 1) {
-    const z = pickRange([state.bounds.minZ, state.bounds.maxZ], state.random);
-    const candidate = new THREE.Vector3(edgeX, y, z);
+    const crossValue = pickRange([crossMin, crossMax], state.random);
+    const candidate = new THREE.Vector3(currentPosition.x, y, currentPosition.z);
+    candidate[walkAxis] = targetEdge;
+    candidate[crossAxis] = crossValue;
 
-    if (avoidCurrentLine && Math.abs(candidate.z - currentPosition.z) < 1.15) {
+    if (avoidCurrentLine && Math.abs(candidate[crossAxis] - currentPosition[crossAxis]) < 1.15) {
       continue;
     }
 
@@ -252,7 +272,16 @@ function pickWalkTarget({
     }
   }
 
-  return new THREE.Vector3(edgeX, y, fallbackZ);
+  const fallback = new THREE.Vector3(currentPosition.x, y, currentPosition.z);
+  fallback[walkAxis] = targetEdge;
+  fallback[crossAxis] = fallbackCross;
+  return fallback;
+}
+
+function getInitialDirection(position, bounds, axis) {
+  const min = axis === 'z' ? bounds.minZ : bounds.minX;
+  const max = axis === 'z' ? bounds.maxZ : bounds.maxX;
+  return position[axis] > (min + max) / 2 ? -1 : 1;
 }
 
 function isBlocked(position, state) {
@@ -290,6 +319,10 @@ function isRootMotionTrack(track) {
 
 function pickRange(range, random) {
   return THREE.MathUtils.lerp(range[0], range[1], random());
+}
+
+function getShortestAngleDelta(from, to) {
+  return Math.atan2(Math.sin(to - from), Math.cos(to - from));
 }
 
 function hashString(value) {
