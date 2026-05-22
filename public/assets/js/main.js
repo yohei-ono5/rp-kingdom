@@ -6,7 +6,8 @@ import {
   HOUSE_DESTINATIONS,
   LAND_PLOTS,
   TREE_SCATTER,
-  VIDEO_BILLBOARDS
+  VIDEO_BILLBOARDS,
+  WEST_TREE_SCATTER
 } from './site-config.js';
 import {
   applyFocusCamera as applyDoorFocusCamera,
@@ -41,8 +42,8 @@ const PARTICLE_FORMATION_DURATION = 4000;
 const PARTICLE_WORLD_REVEAL_START = 0.76;
 const PARTICLE_WORLD_REVEAL_END = 1;
 const INTRO_GROUND_PREVIEW_OPACITY = 0.14;
-const FOG_NEAR = 28;
-const FOG_FAR = 70;
+const FOG_NEAR = 48;
+const FOG_FAR = 130;
 const MAP_FOG_NEAR = 60;
 const MAP_FOG_FAR = 180;
 const MAP_CAMERA_HEIGHT = 75;
@@ -79,7 +80,7 @@ const camera = new THREE.PerspectiveCamera(
   50,
   window.innerWidth / window.innerHeight,
   0.1,
-  100
+  180
 );
 camera.position.set(-0.8, MAP_CAMERA_HEIGHT, 5.0);
 
@@ -233,8 +234,8 @@ const cameraState = {
     target: new THREE.Vector3(-0.8, 0, 1.2)
   },
   village: {
-    position: new THREE.Vector3(13.5, 15.5, 25.5),
-    target: new THREE.Vector3(-1.6, 0.8, 1.6)
+    position: new THREE.Vector3(6.5, 18.5, 31.0),
+    target: new THREE.Vector3(-2.8, 0.95, 2.8)
   },
   map: {
     position: new THREE.Vector3(-0.8, MAP_CAMERA_HEIGHT, 5.0),
@@ -565,17 +566,21 @@ void initCharacters({
     billboards: VIDEO_BILLBOARDS
   })
 });
-void initTrees({
-  treeConfig: TREE_SCATTER,
-  parentGroup: sceneryGroup,
-  exclusions: createTreeExclusions({
-    houses: [...HOUSE_DESTINATIONS, FRONT_HOUSE_DESTINATION],
-    plots: LAND_PLOTS,
-    billboards: VIDEO_BILLBOARDS,
-    padding: TREE_SCATTER.exclusionPadding
-  })
-}).catch((error) => {
-  console.error('Failed to initialize trees.', error);
+const treeExclusions = createTreeExclusions({
+  houses: [...HOUSE_DESTINATIONS, FRONT_HOUSE_DESTINATION],
+  plots: LAND_PLOTS,
+  billboards: VIDEO_BILLBOARDS,
+  padding: TREE_SCATTER.exclusionPadding
+});
+
+[TREE_SCATTER, WEST_TREE_SCATTER].forEach((treeConfig) => {
+  void initTrees({
+    treeConfig,
+    parentGroup: sceneryGroup,
+    exclusions: treeExclusions
+  }).catch((error) => {
+    console.error('Failed to initialize trees.', error);
+  });
 });
 rebuildMapLabels();
 void loadWorldObjects({

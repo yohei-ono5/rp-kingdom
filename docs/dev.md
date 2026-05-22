@@ -7,7 +7,7 @@
 - `public/assets/js/main.js`: 起動処理、シーン/カメラ/レンダラ構築、ビュー状態管理、カメラ補間、アニメーションループ、省電力用の FPS 間引きとタブ非表示時停止
 
 ### 設定
-- `public/assets/js/site-config.js`: 通常ハウス 4 件（`HOUSE_DESTINATIONS`）、前面のアーティストハウス（`FRONT_HOUSE_DESTINATION`）、キャラクター（`CHARACTERS`）、売地/広告枠区画（`LAND_PLOTS`）、動画看板（`VIDEO_BILLBOARDS`）のID、URL、配置、サイズなど非表示設定
+- `public/assets/js/site-config.js`: 通常ハウス 4 件（`HOUSE_DESTINATIONS`）、前面のアーティストハウス（`FRONT_HOUSE_DESTINATION`）、キャラクター（`CHARACTERS`）、売地/広告枠区画（`LAND_PLOTS`）、ツリー散布（`TREE_SCATTER` / `WEST_TREE_SCATTER`）、動画看板（`VIDEO_BILLBOARDS`）のID、URL、配置、サイズなど非表示設定
 - `public/assets/js/i18n.js`: Languageメニュー、ナビ、HUD、確認ポップアップ、時計ラベル、建物/看板名、売地文言の多言語辞書
 
 ### モジュール
@@ -24,8 +24,10 @@
 - `public/assets/js/ui/link-popup.js`: 確認ポップアップの DOM 生成、アンカー（ドアまたは看板）のワールド座標をスクリーン投影して毎フレーム追従
 
 ### アセット
-- `public/assets/models/Fantasy_House_6.glb`: 通常の建物（Company / Music / SNS / Store）
+- `public/assets/models/Fantasy_House_6.glb`: 通常の建物（Company / Music / Store）
 - `public/assets/models/Fantasy_House.glb`: 前面のアーティストハウス（Artist）
+- `public/assets/models/windmill.glb`: SNS 用の風車
+- `public/assets/image/intro-logo.jpg`: イントロ画面のロゴ画像
 - R2 `character.glb`: 村を歩くNPCキャラクター。Pages の単一ファイル 25 MiB 制限を避けるため、Git/Pages には同梱しない
 - `public/assets/videos/`: 動画看板用 mp4 のローカル置き場（`.gitignore` で除外、本番は Cloudflare R2 から配信）
 - `resources/models/tree_LOD0.glb`: 未使用アセット
@@ -34,8 +36,8 @@
 
 - 初回表示は雲に包まれたイントロ画面で、`ENTER` ボタンまたは Enter キーで降下開始。MAP 高度（y=75）から HOME 位置までベジェで降下する `intro-enter` 遷移
 - `ENTER` 後は上空から降るパステル粒子が家・看板・地面へ集まって世界を形成する。地面だけは薄く先行表示し、降下時の距離感を補助する。形成完了後の粒子は非表示になり更新処理も止まる
-- 上ナビ左側に `ARTIST NAME` ブロック + 時計、右側に `HOME` + 動的生成されるナビボタン（`Artist` `Company` `Music` `Store` `Youtube`）+ `MAP` + `Language`
-- `HOME` は初期カメラ位置（通常村ビュー）に戻る
+- 上ナビ左側に `ARTIST NAME` ブロック + 時計、右側に `HOME` + 動的生成されるナビボタン（`Artist` `Company` `Music` `SNS` `Store` `Youtube`）+ `MAP` + `Language`
+- `HOME` は南側寄りの通常村ビュー（`cameraState.village`）に戻る
 - 各ナビボタン／3D オブジェクトのクリックはどちらも、対象前までズーム → 少し待って確認ポップアップ → 移動またはキャンセル
 - 建物ボタンはドア前にズーム、`Youtube` ボタンは動画看板の正面（南向き）にズームする
 - 確認ポップアップでキャンセル or 背景クリックすると通常の村ビューへ戻る
@@ -47,10 +49,12 @@
 - `?hour=<0-23>` クエリで時刻を固定できる（テスト用）
 - 夜間は星空（カメラ追従の Points）と月（Sprite ハロー付き）がフェードイン
 - 夜間は各ハウスに窓明かり/玄関ランタンの `PointLight` が自動で灯る（`timeOfDayState.sunIntensity` を元にした nightFactor で減衰、MAP 時は弱める）
-- `Fantasy_House_6.glb` を使う通常ハウス（Company / Music / SNS / Store）は約1.5倍に拡大。拡大後の干渉を避けるためSNSハウスは西側（X=-20.4）へ配置
+- `Fantasy_House_6.glb` を使う通常ハウス（Company / Music / Store）は約1.5倍に拡大。SNS は `windmill.glb` を使い、Musicハウスとの干渉を避けるため西側（X=-20.4）へ配置
+- ドアフォーカスは建物ごとの `doorOffset` / `doorFacing` で調整。Artist は西側入口（`doorFacing: [-1, 0, 0]`）、SNS 風車は北側入口（`doorFacing: [0, 0, -1]`）
 - 動画看板（`VIDEO_BILLBOARDS`）は Music ハウスの南側に配置、画面が南向きで `MeshBasicMaterial` + `VideoTexture` により時間帯に左右されず自発光表示。クリック / `Youtube` ナビボタン / MAPラベルで看板正面にカメラがズームして確認ポップアップから外部リンク（YouTube）へ
 - 動画看板は通常の村ビュー中のみ再生し、MAP 表示中やタブ非表示時は pause して `VideoTexture` のデコード/更新負荷を抑える
-- 売地/広告枠区画は `FOR SALE` 看板、境界線、杭で構成した 3D オブジェクトとして表示
+- 売地/広告枠区画は `FOR SALE` 看板、境界線、杭で構成した 3D オブジェクトとして表示。Artist 北側にあった `A-02` は削除済み
+- HOME 視点の見栄えを補うため、北側の `TREE_SCATTER` に加えて西側に `WEST_TREE_SCATTER` を追加配置
 - キャラクター（`CHARACTERS`）は R2 上の `character.glb` を使用し、高さを0.57に正規化して地面に接地。GLB内のルート移動を除去した歩行アニメーションを再生しつつ、サイト側で端から端へ歩かせる
 - キャラクターは端に着くとランダムな待機時間を挟んで反対側へ戻る。建物・売地・看板は簡易障害物として扱い、ぶつかりそうな場合は侵入せず方向転換する
 - PC では売地/広告枠区画ホバーで右下パネルに詳細を表示し、区画が僅かに浮き上がる
@@ -61,7 +65,7 @@
 - 高 DPI 画面は `MAX_RENDER_PIXEL_RATIO = 1.35` でクランプ、シャドウマップは 1024
 - タブ非表示時は描画ループを停止し、通常アイドル時は 30fps 相当に間引く。イントロ、カメラ遷移、MAP、ポップアップ、操作直後は 60fps 相当に戻す
 - `DirectionalLight` の影カメラは `±25` 単位の直交フラスタムで全建物を含む（影クリップ防止、`shadow.bias = -0.0005`）
-- フォグの近/遠距離はビューに応じて補間（村: `28/70`、MAP: `60/180`）
+- フォグの近/遠距離はビューに応じて補間（村: `48/130`、MAP: `60/180`）
 
 ## カメラ遷移
 
@@ -88,12 +92,12 @@
 - 新しい建物モデルを追加する場合は `modelUrl` と `doorOffset` / `doorFacing` をセットで定義（フォーカスカメラとポップアップ位置に直結）
 - 新しい動画看板を追加する場合は `VIDEO_BILLBOARDS` に項目追加（`id` / `position` / `rotationY` / `width` / `height` / `videoUrl` / `url`）。同じ `id` で `i18n.js` の `destinations` に文言を追加するとナビボタンとMAPラベルに反映される
 - キャラクターの配置、向き、高さ、移動範囲、歩行速度、待機時間は `CHARACTERS` の `position` / `rotationY` / `height` / `movement` で調整する。横歩きに見える場合は `movement.facingOffset` でモデル正面軸を補正する
-- 動画ファイルは Cloudflare R2 にホスト（egress 無料）し、`site-config.js` の URL 定数（`YOUTUBE_PROMO_VIDEO_URL` 等）を R2 の `https://pub-xxxx.r2.dev/<file>.mp4` に差し替え。ローカル開発用に `public/assets/videos/` に同名 mp4 を置いてもよい（`.gitignore` で除外済み）
-- 大きな3Dモデルも Cloudflare R2 にホストする。`3D_object/character.glb` は Pages の単一ファイル 25 MiB 制限を超えるため、`public/assets/models/character.glb` は `.gitignore` で除外し、`CHARACTER_MODEL_URL` からR2 URLを読む
-- R2 の CORS ポリシーは `AllowedOrigins: ["*"]` / `AllowedMethods: ["GET", "HEAD"]` を許可（`THREE.VideoTexture` で WebGL テクスチャ化するため必須）
+- 動画ファイルは Cloudflare R2 にホストし、`site-config.js` の URL 定数（`YOUTUBE_PROMO_VIDEO_URL` 等）を R2 の公開 URL に差し替え。ローカル開発用に `public/assets/videos/` に同名 mp4 を置いてもよい（`.gitignore` で除外済み）
+- 大きな3Dモデルも Cloudflare R2 にホストする。`3D_object/character.glb` と `windmill.glb` は Pages の単一ファイル 25 MiB 制限を超えるため、本番では `CHARACTER_MODEL_URL` / `WINDMILL_MODEL_URL` を R2 URL に差し替える
+- R2 の CORS ポリシーは `AllowedMethods: ["GET", "HEAD"]` を許可。`AllowedOrigins` は本番 Pages ドメインに絞る。preview が多い開発中だけ `["*"]` を一時利用してよい
 - 動画要素は `crossOrigin = 'anonymous'` 必須（R2 など外部 CDN から WebGL に流すため）
 - 動画看板の再生制御は `scene/video-billboards.js` の `updateVideoBillboardPlayback` で管理。村ビューでは再生し、MAP とタブ非表示時は pause する
-- イントロの見た目調整は `public/index.html` の `#intro-overlay` 周辺
+- イントロの見た目調整は `public/index.html` の `#intro-overlay` 周辺。ロゴ画像は `public/assets/image/intro-logo.jpg`
 - イントロ形成粒子は `scene/particle-field.js` で管理。粒子数、開始高度、分散範囲、パステル変換、地面先行表示との兼ね合い、形成完了後の停止は同ファイルと `main.js` の `PARTICLE_*` 定数で調整
 - 時計の表示・配置は `public/index.html` の `#tod-widget` と `.nav-left` 周辺
 - Languageメニューの見た目は `public/index.html` の `.language-menu` 周辺、言語一覧・代表タイムゾーン・文言は `public/assets/js/i18n.js`
@@ -101,7 +105,7 @@
 - MAPラベルの見た目は `public/index.html` の `#map-label-layer` 周辺、生成・クリック処理は `public/assets/js/main.js` の `rebuildMapLabels` / `focusMapLabelSubject` / `updateMapLabels`
 - 売地パネルの見た目調整は `public/index.html` の `#plot-panel` 周辺
 - カメラワーク調整は `public/assets/js/camera/transition-paths.js`（軌道）と `public/assets/js/main.js` の `CAMERA_TRANSITION_DURATION` / `INTRO_TRANSITION_DURATION`
-- `HOME` の通常ビュー位置は `public/assets/js/main.js` の `cameraState.village`
+- `HOME` の通常ビュー位置は `public/assets/js/main.js` の `cameraState.village`。現在は南側寄りのやや引いた視点
 - イントロ起点は `cameraState.intro`（現在は MAP と同じ高度・target）
 - MAP の高度・距離リミット・フォグは `MAP_CAMERA_HEIGHT` / `MAP_MIN_DISTANCE` / `MAP_MAX_DISTANCE` / `MAP_FOG_NEAR` / `MAP_FOG_FAR`
 - フォーカスカメラの距離・高さは `FOCUS_CAMERA_OPTIONS`（`cameraDistance` でドアからの距離、`cameraHeight` で高さ、`targetHeight` で注視点高さ）

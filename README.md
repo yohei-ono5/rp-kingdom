@@ -1,6 +1,6 @@
 # RP_kingdom
 
-Three.js を使った絵本風 3D 村の試作です。`public/assets/models/Fantasy_House_6.glb` と `public/assets/models/Fantasy_House.glb` を配置し、通常ビューと MAP ビューを切り替えられる構成にしています。Cloudflare Pages でそのまま公開できる静的サイトです。
+Three.js を使った絵本風 3D 村の試作です。`public/assets/models/Fantasy_House_6.glb`、`public/assets/models/Fantasy_House.glb`、`public/assets/models/windmill.glb` を配置し、通常ビューと MAP ビューを切り替えられる構成にしています。Cloudflare Pages で公開する静的サイトですが、25 MiB を超える GLB / mp4 は Cloudflare R2 から配信する想定です。
 
 ## 現在の構成
 
@@ -10,7 +10,7 @@ Three.js を使った絵本風 3D 村の試作です。`public/assets/models/Fan
 - イントロの `ENTER` 後は、MAP 高度（y=75）から地上の HOME 位置までベジェで降下する `intro-enter` トランジション
 - 上ナビは左に `ARTIST NAME` ブランド + 時計、右に `HOME`、`Artist` `Company` `Music` `SNS` `Store` `Youtube` のナビボタン、`MAP` トグル、`Language` メニューを表示
 - ナビボタンは `site-config.js` の定義（`HOUSE_DESTINATIONS` + `FRONT_HOUSE_DESTINATION` + `VIDEO_BILLBOARDS`）から動的に生成し、表示文言は `i18n.js` の `destinations` で管理
-- `HOME` は通常の村ビュー（斜め上からの引き）へ戻す操作
+- `HOME` は通常の村ビュー（南側寄りの斜め上視点）へ戻す操作
 - `Artist` `Company` `Music` `SNS` `Store` は建物玄関前へズームしたあと、確認ポップアップを経由して外部リンクへ遷移（`Music` は `Spotify` / `Apple Music` / `キャンセル` の3ボタン選択）
 - `Youtube` は動画看板の正面にズームし、再生中の映像を見たうえで確認ポップアップから YouTube チャンネルへ遷移。看板フォーカス中のみポーラ角を90度まで許可し、真正面表示の最終補正によるカクつきを抑制
 - 確認ポップアップでキャンセルまたは背景クリックをした場合は、フォーカスを解除して通常の村ビューへ戻る
@@ -20,8 +20,10 @@ Three.js を使った絵本風 3D 村の試作です。`public/assets/models/Fan
 
 ### 見え方と演出
 
-- `Artist` だけ別モデル（`Fantasy_House.glb`）、他の建物（Company / Music / SNS / Store）は共通モデル（`Fantasy_House_6.glb`）を使用
-- `Fantasy_House_6.glb` を使う通常ハウスは初期値から約1.5倍に拡大し、SNSハウスはMusicハウスとの干渉を避けるため西側（X=-20.4）へ配置
+- `Artist` だけ別モデル（`Fantasy_House.glb`）、`SNS` は風車モデル（`windmill.glb`）、他の建物（Company / Music / Store）は共通モデル（`Fantasy_House_6.glb`）を使用
+- `Fantasy_House_6.glb` を使う通常ハウスは初期値から約1.5倍に拡大し、SNSの風車はMusicハウスとの干渉を避けるため西側（X=-20.4）へ配置
+- `Artist` の入口は西側、`SNS` 風車の入口は北側、通常ハウスは各モデルの玄関側に合わせて `doorOffset` / `doorFacing` を個別設定
+- `HOME` 視点は `cameraState.village` で、現在は南側寄りから村全体を見下ろす位置に設定。通常ビューのフォグは引き視点でも白くなりすぎないよう `48/130` に調整
 - 時計は日本語では `Asia/Tokyo` のみ、日本語以外では `Asia/Tokyo` と選択言語ごとの代表タイムゾーン（例: `Europe/Paris`）を2行表示。時間帯演出は常に `Asia/Tokyo` 基準
 - 深夜・朝焼け・昼・午後・夕暮れ・夜の 6 段階で空、フォグ、地面、アンビエント/サン/フィルライト、トーンマッピング露出を補間し、朝夕は太陽位置に応じて影の向きも変化
 - 夜間帯（概ね 19 時過ぎ〜翌 5 時前）はカメラに追従する星空と月、月のハロースプライトが徐々に現れる
@@ -32,7 +34,8 @@ Three.js を使った絵本風 3D 村の試作です。`public/assets/models/Fan
 - 動画看板は通常の村ビュー中のみ再生し、MAP 表示中やタブ非表示時は pause して `VideoTexture` の更新負荷を抑える
 - 動画ファイル本体は Cloudflare R2 にホストし、CORS 経由で WebGL テクスチャに使用（リポジトリには含めない）
 - `ENTER` 後は上空から降る粒子が家・看板・地面へ集まって世界を形作り、地面だけを薄く先行表示して降下時の距離感を補助
-- 村の空きスペースに `FOR SALE` 看板付きの売地/広告枠区画を配置（境界線、杭、看板、立て札の3Dオブジェクト）
+- 村の空きスペースに `FOR SALE` 看板付きの売地/広告枠区画を配置（境界線、杭、看板、立て札の3Dオブジェクト）。Artist 北側にあった `A-02` 区画は削除済み
+- HOME 視点での奥行きを出すため、既存の北側林に加えて西側にも追加ツリー散布（`WEST_TREE_SCATTER`）を設定
 - R2 上の `character.glb` を村の中央付近に配置し、GLBに含まれる歩行アニメーションを使って、端から端へ歩くNPC風の移動を実行。端に着くとランダムな時間だけ止まり、反対側へ戻る。建物・売地・看板には簡易障害物判定を付け、ぶつかりそうな場合は方向転換する
 - 売地/広告枠区画にホバーすると、区画名、価格、サイズ、説明をカーソル近くのパネルに表示し、区画が少し浮き上がる。クリックすると区画中心へズーム
 - 村ビューでは建物ホバー時にツールチップで建物名を表示、建物が僅かに拡大
@@ -60,6 +63,7 @@ python3 -m http.server 5500
 
 - `public/`: Cloudflare Pages にそのまま配信する公開物
 - `public/index.html`: ナビ、HUD、イントロ、時計、Languageメニュー、コンパス、MAPラベル、ツールチップ、売地パネルのマークアップとスタイル
+- `public/assets/image/`: イントロなどで使う画像アセット（`intro-logo.jpg`）
 - `public/assets/js/main.js`: 起動処理、シーン/カメラ/ライト構築、ビュー状態管理、アニメーションループ、省電力用の FPS 間引きとタブ非表示時停止
 - `public/assets/js/site-config.js`: 建物/看板/売地のID、遷移先 URL、配置、ドア設定、サイズ、動画 URL など非表示設定の定義
 - `public/assets/js/i18n.js`: Languageメニュー、ナビ、HUD、ポップアップ、時計ラベル、建物/看板名、売地文言の多言語辞書
@@ -74,7 +78,7 @@ python3 -m http.server 5500
 - `public/assets/js/scene/sky-objects.js`: 夜の星空と月（カメラ追従）の生成と表示制御
 - `public/assets/js/systems/time-of-day.js`: `Asia/Tokyo` の取得、時間帯ライティング/太陽位置補間、時計 UI 更新
 - `public/assets/js/ui/link-popup.js`: 建物ドア／看板上に追従する確認ポップアップの生成と表示制御。単一リンクと複数リンク選択（Music の `Spotify` / `Apple Music`）に対応
-- `public/assets/models/`: Pages に同梱できる軽量 GLB アセット（`Fantasy_House_6.glb`, `Fantasy_House.glb`, `tree_LOD0.glb`）
+- `public/assets/models/`: GLB アセット（`Fantasy_House_6.glb`, `Fantasy_House.glb`, `windmill.glb`, `tree_LOD0.glb`）
 - `public/assets/videos/`: 動画看板用 mp4 のローカル置き場（`*.mp4` は `.gitignore` で除外、本番は Cloudflare R2 から配信）
 - `resources/`: 公開対象に含めない素材置き場
 - `docs/`: 開発メモ
@@ -91,6 +95,7 @@ python3 -m http.server 5500
 - ドア位置とドアの向き（`doorOffset`, `doorFacing`）を微調整してフォーカスカメラとポップアップ位置を合わせる
 - キャラクターの配置、向き、高さ、移動範囲は `CHARACTERS` の `position` / `rotationY` / `height` / `movement` を変える
 - 売地/広告枠区画のサイズ、配置を変える
+- 木の配置は `TREE_SCATTER`（主に北側）と `WEST_TREE_SCATTER`（西側追加）を変える
 - 動画看板の `position` / `rotationY` / `width` / `height`、再生する動画 URL（`videoUrl`、R2 など外部 CDN 推奨）、遷移先 URL（`url`）を変える
 
 `site-config.js` の `id` と `i18n.js` の `destinations.<id>` / `plots.<id>` は対応しています。建物や看板を追加するときは、`site-config.js` に配置やURLを追加し、同じ `id` で `i18n.js` に表示文言を追加してください。`HOUSE_DESTINATIONS` は通常ハウス、`FRONT_HOUSE_DESTINATION` は前面のアーティストハウス、`VIDEO_BILLBOARDS` は動画看板の定義です。`Music` のように複数の遷移先を出す場合は `url` の代わりに `links` を使います。
@@ -98,6 +103,7 @@ python3 -m http.server 5500
 ## UIメモ
 
 - イントロ画面の見た目は `public/index.html` の `#intro-overlay` 周辺で管理
+- イントロロゴは `public/assets/image/intro-logo.jpg` を `public/index.html` の `.intro-logo` で表示
 - 時計表示は `public/index.html` の `#tod-widget` 周辺、表示内容とタイムゾーン設定は `i18n.js` と `systems/time-of-day.js` で管理
 - Languageメニューの見た目は `public/index.html` の `.language-menu` 周辺、言語一覧と文言は `i18n.js` で管理
 - MAPラベルの見た目は `public/index.html` の `#map-label-layer` 周辺、表示/クリック制御は `main.js` の `rebuildMapLabels` / `updateMapLabels` 周辺で管理
@@ -144,21 +150,28 @@ python3 -m http.server 5500
 - 以後は `main` に push すると自動で本番更新される
 - 独自ドメインを使う場合は Pages プロジェクトの `Custom domains` から追加する
 
-## 動画ファイルの配信（Cloudflare R2）
+## 大きなアセットの配信（Cloudflare R2）
 
-動画看板（`VIDEO_BILLBOARDS`）の mp4 は GitHub に置かず Cloudflare R2 でホストしています。リポジトリ肥大とデプロイ遅延を避けるためです。
+Cloudflare Pages / Workers Static Assets は単一ファイル 25 MiB までのため、`character.glb` や `windmill.glb` のような大きな GLB、動画看板用 mp4 は GitHub / Pages に置かず Cloudflare R2 から配信します。リポジトリ肥大、Pages のアップロード制限、デプロイ遅延を避けるためです。
 
-### セットアップ
+### R2 に置く対象
 
-1. Cloudflare ダッシュボード → R2 Object Storage で新規バケット作成（例: `rp-kingdom-media`、APAC）
-2. mp4 をアップロード
-3. バケット設定 → 「パブリック開発 URL」を有効化、`https://pub-xxxxxxxx.r2.dev/<filename>.mp4` 形式の URL を取得
-4. CORS ポリシーに以下を追加（`THREE.VideoTexture` は WebGL テクスチャとして使うため CORS 必須）
+- `character.glb`: `CHARACTER_MODEL_URL` で R2 URL を指定
+- `windmill.glb`: 40 MiB 前後あるため、本番では R2 にアップロードして `WINDMILL_MODEL_URL` を R2 URL に差し替える
+- 動画看板用 mp4: `YOUTUBE_PROMO_VIDEO_URL` などの URL 定数を R2 URL にする
+
+### R2 セットアップ
+
+1. Cloudflare ダッシュボードで `R2 Object Storage` を開き、新規バケットを作成する（例: `rp-kingdom-media`）
+2. バケットに `3D_object/character.glb`、`3D_object/windmill.glb`、`youtube-promo.mp4` などをアップロードする
+3. 本番ではバケットにカスタムドメインを接続する。暫定確認だけなら `r2.dev` の Public Development URL を有効化して使う
+4. 取得した公開 URL をブラウザで直接開き、`200 OK` でファイルが落ちることを確認する
+5. GLB / mp4 を外部ドメインから読むため、必要に応じて CORS ポリシーを設定する。動画を `THREE.VideoTexture` として WebGL テクスチャ化する場合は CORS が必要
 
 ```json
 [
   {
-    "AllowedOrigins": ["*"],
+    "AllowedOrigins": ["https://<your-pages-domain>"],
     "AllowedMethods": ["GET", "HEAD"],
     "AllowedHeaders": ["*"],
     "MaxAgeSeconds": 3000
@@ -166,23 +179,24 @@ python3 -m http.server 5500
 ]
 ```
 
-5. `site-config.js` の動画 URL 定数（`YOUTUBE_PROMO_VIDEO_URL` など）を R2 の URL に差し替え
+開発中に Pages ドメインが未確定、または複数の preview URL で確認する場合だけ、`AllowedOrigins` を一時的に `["*"]` にしてもよいです。本番では Pages の本番ドメインに絞るのが無難です。
 
-### 動画を差し替える / 追加する
+6. `public/assets/js/site-config.js` の URL 定数を R2 の公開 URL に差し替える
+
+```js
+const WINDMILL_MODEL_URL = 'https://assets.example.com/3D_object/windmill.glb';
+const CHARACTER_MODEL_URL = 'https://assets.example.com/3D_object/character.glb';
+const YOUTUBE_PROMO_VIDEO_URL = 'https://assets.example.com/youtube-promo.mp4';
+```
+
+### 差し替え / 追加
 
 - 既存の動画を差し替えるだけなら R2 バケットで同名ファイルを上書きアップロード（コード変更不要）
+- 既存の大きな GLB を差し替えるだけなら R2 バケットで同名ファイルを上書きアップロード（コード変更不要）
 - 別の URL に変える場合は `site-config.js` の URL 定数を更新
 - 動画看板を新規追加するなら `VIDEO_BILLBOARDS` 配列に項目追加
 
-## 大きな3Dモデルの配信（Cloudflare R2）
-
-Cloudflare Pages は単一ファイル 25 MiB までのため、`character.glb` のような大きなモデルは R2 に置きます。ローカル確認用に `public/assets/models/character.glb` を置いても Git 管理には含めません。
-
 現在のキャラクターモデル URL は `site-config.js` の `CHARACTER_MODEL_URL` で管理します。R2 側の `3D_object/character.glb` を差し替えた場合、同じファイル名ならコード変更は不要です。別名や別バケットにする場合はこの URL を更新してください。
-
-### コスト
-
-R2 はストレージ 10GB / 月 まで無料、egress（転送量）は無制限で 0 円。トラフィックが増えてもコスト変動なし。
 
 ## 動作確認ポイント
 
@@ -198,7 +212,7 @@ R2 はストレージ 10GB / 月 まで無料、egress（転送量）は無制�
 10. 上部の `HOME` で斜め上からの通常村ビューに戻れる
 11. 上部の建物ボタンでも該当建物へズームし、確認後に外部リンクへ遷移できる
 12. `Music` ボタンまたはMusicハウスクリックでズームし、確認ポップアップに `Spotify` `Apple Music` `キャンセル` の3ボタンが横並びで表示される
-13. `SNS` ボタンまたはSNSハウスクリックでズームし、確認ポップアップからInstagram公式アカウントへ遷移できる
+13. `SNS` ボタンまたはSNS風車クリックでズームし、確認ポップアップからInstagram公式アカウントへ遷移できる
 14. `Youtube` ボタン、動画看板クリック、MAPラベルクリックで看板正面にズームし、映像が再生される。確認ポップアップから YouTube チャンネルへ遷移でき、ズーム完了時にカメラがカクつかない
 15. `Asia/Tokyo` の時計が表示され、時間帯に応じて全体の光と影の向きが変わる。日本語以外では2行目に選択言語ごとの代表タイムゾーンも表示される
 16. 夜帯（19 時台後半〜翌 5 時台前半）で星空と月が徐々に表示される
