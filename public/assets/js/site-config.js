@@ -83,6 +83,37 @@ export const VIDEO_BILLBOARDS = [
   }
 ];
 
+export const ROAD_PATHS = [
+  {
+    id: 'main-road',
+    width: 2.8,
+    textureRepeat: 2.1,
+    points: [
+      [-7.2, 0, 29.0],
+      [-7.4, 0, 21.0],
+      [-7.6, 0, 15.2],
+      [-6.2, 0, 9.0],
+      [-2.2, 0, 4.0],
+      [0.6, 0, 0.0],
+      [1.6, 0, -5.8],
+      [1.2, 0, -15.5],
+      [0.8, 0, -28.0]
+    ]
+  },
+  {
+    id: 'east-road',
+    width: 3.2,
+    textureRepeat: 1.9,
+    points: [
+      [0.2, 0, 0.6],
+      [5.2, 0, 0.8],
+      [12.4, 0, 1.6],
+      [20.0, 0, 2.2],
+      [28.0, 0, 2.5]
+    ]
+  }
+];
+
 export const CHARACTERS = [
   {
     id: 'main-character',
@@ -151,9 +182,9 @@ export const LAND_PLOTS = [
   {
     id: 'B-01',
     size: '4.6m x 4.0m',
-    position: [2.2, 0, -15.4],
+    position: [18.2, 0, 7.4],
     width: 4.6,
     depth: 4.0,
-    rotationY: 0.05
+    rotationY: -0.12
   }
 ];

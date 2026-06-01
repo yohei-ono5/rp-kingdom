@@ -35,6 +35,7 @@ Three.js を使った絵本風 3D 村の試作です。`public/assets/models/Fan
 - 動画ファイル本体は Cloudflare R2 にホストし、CORS 経由で WebGL テクスチャに使用（リポジトリには含めない）
 - `ENTER` 後は上空から降る粒子が家・看板・地面へ集まって世界を形作り、地面だけを薄く先行表示して降下時の距離感を補助
 - 村の空きスペースに `FOR SALE` 看板付きの売地/広告枠区画を配置（境界線、杭、看板、立て札の3Dオブジェクト）。Artist 北側にあった `A-02` 区画は削除済み
+- 村の導線が分かるよう、`ROAD_PATHS` に基づくアスファルト調の曲線道路を地面上に配置。道路上には木が生成されないよう、ツリー散布の除外エリアにも道路を反映
 - HOME 視点での奥行きを出すため、既存の北側林に加えて西側にも追加ツリー散布（`WEST_TREE_SCATTER`）を設定
 - 建物モデルは URL ごとにキャッシュしつつ並列読み込みするため、重いモデルがあっても他の建物の表示開始を待たせにくい
 - R2 上の `character.glb` を村の中央付近に配置し、GLBに含まれる歩行アニメーションを使って、端から端へ歩くNPC風の移動を実行。端に着くとランダムな時間だけ止まり、反対側へ戻る。建物・売地・看板には簡易障害物判定を付け、ぶつかりそうな場合は方向転換する
@@ -74,6 +75,7 @@ python3 -m http.server 5500
 - `public/assets/js/scene/world-objects.js`: GLB 読み込み、モデル URL ごとのキャッシュ、並列読み込み、マテリアル補正、建物配置、MAP 用マーカー生成
 - `public/assets/js/scene/characters.js`: キャラクターGLBの読み込み、高さ正規化、地面合わせ、アニメーション再生、NPC風の往復移動、簡易障害物回避
 - `public/assets/js/scene/land-plots.js`: 売地/広告枠区画の3D生成とホバー/MAP 遷移の更新処理
+- `public/assets/js/scene/roads.js`: `ROAD_PATHS` の座標から曲線道路メッシュを生成し、CanvasTexture でアスファルト調の面を作成
 - `public/assets/js/scene/video-billboards.js`: 動画看板の3D生成（フレーム + スクリーン + 支柱）、`VideoTexture` 管理、autoplay フォールバック、村ビュー/MAP/タブ状態に応じた再生制御
 - `public/assets/js/scene/particle-field.js`: イントロ時に家・看板・地面へ集まる形成粒子の生成、パステル色化、形成完了後の非表示制御
 - `public/assets/js/scene/sky-objects.js`: 夜の星空と月（カメラ追従）の生成と表示制御
@@ -96,7 +98,7 @@ python3 -m http.server 5500
 - ドア位置とドアの向き（`doorOffset`, `doorFacing`）を微調整してフォーカスカメラとポップアップ位置を合わせる
 - キャラクターの配置、向き、高さ、移動範囲は `CHARACTERS` の `position` / `rotationY` / `height` / `movement` を変える
 - 売地/広告枠区画のサイズ、配置を変える
-- 木の配置は `TREE_SCATTER`（主に北側）と `WEST_TREE_SCATTER`（西側追加）を変える
+- 道路の経路と幅は `ROAD_PATHS` の `points` / `width` を変える。木の配置は `TREE_SCATTER`（主に北側）と `WEST_TREE_SCATTER`（西側追加）を変える
 - 動画看板の `position` / `rotationY` / `width` / `height`、再生する動画 URL（`videoUrl`、R2 など外部 CDN 推奨）、遷移先 URL（`url`）を変える
 
 `site-config.js` の `id` と `i18n.js` の `destinations.<id>` / `plots.<id>` は対応しています。建物や看板を追加するときは、`site-config.js` に配置やURLを追加し、同じ `id` で `i18n.js` に表示文言を追加してください。`HOUSE_DESTINATIONS` は通常ハウス、`FRONT_HOUSE_DESTINATION` は前面のアーティストハウス、`VIDEO_BILLBOARDS` は動画看板の定義です。`Music` のように複数の遷移先を出す場合は `url` の代わりに `links` を使います。
@@ -115,6 +117,7 @@ python3 -m http.server 5500
 - 時間帯ライティングは `systems/time-of-day.js` の `timeOfDayStops` で管理
 - 夜空の星と月は `scene/sky-objects.js` で管理（`getNightProgress` で表示量を算出）
 - 売地/広告枠区画の3D生成は `scene/land-plots.js` の `initLandPlots` 周辺で管理
+- 道路の見た目と生成は `scene/roads.js` で管理。経路・幅は `site-config.js` の `ROAD_PATHS` で調整
 - 確認ポップアップは `ui/link-popup.js` が DOM を生成し、毎フレーム `updatePosition` でドア位置に追従
 - 建物クリック時のフォーカス位置は `camera/focus-camera.js` の `applyFocusCamera`（ドアから前に出て少し上から見下ろす）。売地/広告枠区画は `main.js` の `applyPlotFocusCamera` で区画中心へズーム
 - 動画看板の見た目（フレーム / スクリーン / 支柱の素材・サイズ）は `scene/video-billboards.js` の定数とマテリアル定義

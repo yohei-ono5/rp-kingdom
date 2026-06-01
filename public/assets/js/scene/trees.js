@@ -86,6 +86,7 @@ function addInstancedTrees({
 export function createTreeExclusions({
   houses = [],
   plots = [],
+  roads = [],
   billboards = [],
   padding = 1.7
 }) {
@@ -109,6 +110,22 @@ export function createTreeExclusions({
       halfDepth: (plot.depth || 4.5) / 2 + padding,
       rotationY: plot.rotationY || 0
     });
+  });
+
+  roads.forEach((road) => {
+    const points = road.points || [];
+    const radius = (road.width || 3.2) / 2 + padding;
+
+    for (let index = 1; index < points.length; index += 1) {
+      zones.push({
+        type: 'capsule',
+        ax: points[index - 1][0],
+        az: points[index - 1][2],
+        bx: points[index][0],
+        bz: points[index][2],
+        radius
+      });
+    }
   });
 
   billboards.forEach((billboard) => {
@@ -184,8 +201,31 @@ function isInExclusion(x, z, exclusions) {
       return Math.abs(localX) < zone.halfWidth && Math.abs(localZ) < zone.halfDepth;
     }
 
+    if (zone.type === 'capsule') {
+      return getDistanceToSegment(x, z, zone.ax, zone.az, zone.bx, zone.bz) < zone.radius;
+    }
+
     return false;
   });
+}
+
+function getDistanceToSegment(x, z, ax, az, bx, bz) {
+  const abx = bx - ax;
+  const abz = bz - az;
+  const lengthSq = abx * abx + abz * abz;
+
+  if (lengthSq <= 0.0001) {
+    return Math.hypot(x - ax, z - az);
+  }
+
+  const t = THREE.MathUtils.clamp(
+    ((x - ax) * abx + (z - az) * abz) / lengthSq,
+    0,
+    1
+  );
+  const closestX = ax + abx * t;
+  const closestZ = az + abz * t;
+  return Math.hypot(x - closestX, z - closestZ);
 }
 
 function prepareTreeTemplate(root) {
