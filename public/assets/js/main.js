@@ -5,6 +5,7 @@ import {
   FRONT_HOUSE_DESTINATION,
   HOUSE_DESTINATIONS,
   LAND_PLOTS,
+  ROAD_PATHS,
   TREE_SCATTER,
   VIDEO_BILLBOARDS,
   WEST_TREE_SCATTER
@@ -21,6 +22,7 @@ import {
 import { loadWorldObjects, renderDestinationButtons } from './scene/world-objects.js';
 import { createCharacterObstacles, initCharacters, updateCharacterAnimations } from './scene/characters.js';
 import { initLandPlots, updateLandPlotLanguage, updateLandPlots } from './scene/land-plots.js';
+import { initRoads } from './scene/roads.js';
 import { createTreeExclusions, initTrees } from './scene/trees.js';
 import { initVideoBillboards, updateVideoBillboardPlayback } from './scene/video-billboards.js';
 import { createSkyObjects } from './scene/sky-objects.js';
@@ -113,9 +115,11 @@ const villageGroup = new THREE.Group();
 const mapOverlayGroup = new THREE.Group();
 const sceneryGroup = new THREE.Group();
 const landPlotGroup = new THREE.Group();
+const roadGroup = new THREE.Group();
 const videoBillboardGroup = new THREE.Group();
 scene.add(villageGroup);
 scene.add(mapOverlayGroup);
+scene.add(roadGroup);
 scene.add(sceneryGroup);
 scene.add(landPlotGroup);
 scene.add(videoBillboardGroup);
@@ -538,6 +542,10 @@ document.body.classList.add('intro-active');
 initLights();
 initGround();
 initMapOverlay();
+initRoads({
+  paths: ROAD_PATHS,
+  parentGroup: roadGroup
+});
 initLandPlots({
   plots: LAND_PLOTS,
   landPlotGroup,
@@ -569,6 +577,7 @@ void initCharacters({
 const treeExclusions = createTreeExclusions({
   houses: [...HOUSE_DESTINATIONS, FRONT_HOUSE_DESTINATION],
   plots: LAND_PLOTS,
+  roads: ROAD_PATHS,
   billboards: VIDEO_BILLBOARDS,
   padding: TREE_SCATTER.exclusionPadding
 });
@@ -623,6 +632,7 @@ function refreshParticleFormationTargets() {
     { subject: villageGroup, weight: 3.6 },
     { subject: videoBillboardGroup, weight: 1.5 },
     { subject: landPlotGroup, weight: 0.65 },
+    { subject: roadGroup, weight: 0.34 },
     { subject: sceneryGroup, weight: 0.28 },
     { subject: ground, weight: 0.08 }
   ]);
@@ -1308,6 +1318,7 @@ function updateWorldReveal(formationProgress) {
     { subject: ground, opacity: Math.max(INTRO_GROUND_PREVIEW_OPACITY, revealOpacity) },
     { subject: villageGroup, opacity: revealOpacity },
     { subject: mapOverlayGroup, opacity: revealOpacity },
+    { subject: roadGroup, opacity: revealOpacity },
     { subject: sceneryGroup, opacity: revealOpacity },
     { subject: landPlotGroup, opacity: revealOpacity },
     { subject: videoBillboardGroup, opacity: revealOpacity }

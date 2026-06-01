@@ -7,7 +7,7 @@
 - `public/assets/js/main.js`: 起動処理、シーン/カメラ/レンダラ構築、ビュー状態管理、カメラ補間、アニメーションループ、省電力用の FPS 間引きとタブ非表示時停止
 
 ### 設定
-- `public/assets/js/site-config.js`: 通常ハウス 4 件（`HOUSE_DESTINATIONS`）、前面のアーティストハウス（`FRONT_HOUSE_DESTINATION`）、キャラクター（`CHARACTERS`）、売地/広告枠区画（`LAND_PLOTS`）、ツリー散布（`TREE_SCATTER` / `WEST_TREE_SCATTER`）、動画看板（`VIDEO_BILLBOARDS`）のID、URL、配置、サイズなど非表示設定
+- `public/assets/js/site-config.js`: 通常ハウス 4 件（`HOUSE_DESTINATIONS`）、前面のアーティストハウス（`FRONT_HOUSE_DESTINATION`）、キャラクター（`CHARACTERS`）、道路（`ROAD_PATHS`）、売地/広告枠区画（`LAND_PLOTS`）、ツリー散布（`TREE_SCATTER` / `WEST_TREE_SCATTER`）、動画看板（`VIDEO_BILLBOARDS`）のID、URL、配置、サイズなど非表示設定
 - `public/assets/js/i18n.js`: Languageメニュー、ナビ、HUD、確認ポップアップ、時計ラベル、建物/看板名、売地文言の多言語辞書
 
 ### モジュール
@@ -17,6 +17,7 @@
 - `public/assets/js/scene/world-objects.js`: GLB 読み込み（モデル URL ごとにキャッシュし、並列で開始）、不透明マテリアル補正、建物配置、ナビボタン生成、MAP 用マーカー作成
 - `public/assets/js/scene/characters.js`: キャラクターGLBの読み込み、高さ正規化、地面合わせ、アニメーション再生、NPC風の往復移動、簡易障害物回避
 - `public/assets/js/scene/land-plots.js`: 売地/広告枠の 3D 生成（床・境界・杭・看板テクスチャ）とホバー/MAP 遷移更新
+- `public/assets/js/scene/roads.js`: `ROAD_PATHS` から曲線道路メッシュを生成し、CanvasTexture でアスファルト調の面を作成
 - `public/assets/js/scene/video-billboards.js`: 動画看板の 3D 生成（フレーム + 動画スクリーン + 支柱を `Group` でまとめる）、`HTMLVideoElement` + `THREE.VideoTexture` + `MeshBasicMaterial` でライト非依存の自発光表示、autoplay 失敗時のジェスチャ・フォールバック、村ビュー/MAP/タブ状態に応じた再生制御
 - `public/assets/js/scene/particle-field.js`: イントロ時に家・看板・地面へ集まる形成粒子の生成、パステル色化、形成完了後の非表示制御
 - `public/assets/js/scene/sky-objects.js`: カメラ追従の星空と月、ハロースプライト（夜間のみフェードイン）
@@ -54,6 +55,7 @@
 - 動画看板（`VIDEO_BILLBOARDS`）は Music ハウスの南側に配置、画面が南向きで `MeshBasicMaterial` + `VideoTexture` により時間帯に左右されず自発光表示。クリック / `Youtube` ナビボタン / MAPラベルで看板正面にカメラがズームして確認ポップアップから外部リンク（YouTube）へ
 - 動画看板は通常の村ビュー中のみ再生し、MAP 表示中やタブ非表示時は pause して `VideoTexture` のデコード/更新負荷を抑える
 - 売地/広告枠区画は `FOR SALE` 看板、境界線、杭で構成した 3D オブジェクトとして表示。Artist 北側にあった `A-02` は削除済み
+- 村の主要導線として `ROAD_PATHS` に沿ったアスファルト調の曲線道路を配置。道路上に木が生成されないよう、道路区間をカプセル状のツリー除外エリアとして扱う
 - HOME 視点の見栄えを補うため、北側の `TREE_SCATTER` に加えて西側に `WEST_TREE_SCATTER` を追加配置
 - 建物モデルは URL ごとにキャッシュしつつ並列で読み込むので、`windmill.glb` のような重いモデルが他の建物の表示開始をブロックしにくい
 - キャラクター（`CHARACTERS`）は R2 上の `character.glb` を使用し、高さを0.57に正規化して地面に接地。GLB内のルート移動を除去した歩行アニメーションを再生しつつ、サイト側で端から端へ歩かせる
@@ -88,7 +90,7 @@
 ## 運用メモ
 
 - 表示文言は `public/assets/js/i18n.js` に集約。ナビ、MAPラベル、ツールチップ、確認ポップアップ、HUD、時計ラベル、売地パネル/看板の文言はここを編集
-- リンク、建物配置、ドア位置、売地/広告枠区画のサイズ/配置、動画看板（位置・サイズ・回転・動画 URL・遷移先 URL）の変更は `public/assets/js/site-config.js` を編集
+- リンク、建物配置、ドア位置、道路、売地/広告枠区画のサイズ/配置、動画看板（位置・サイズ・回転・動画 URL・遷移先 URL）の変更は `public/assets/js/site-config.js` を編集
 - `site-config.js` の `id` と `i18n.js` の `destinations.<id>` / `plots.<id>` を一致させる。例: `id: 'company'` なら `destinations.company`
 - 新しい建物モデルを追加する場合は `modelUrl` と `doorOffset` / `doorFacing` をセットで定義（フォーカスカメラとポップアップ位置に直結）
 - 新しい動画看板を追加する場合は `VIDEO_BILLBOARDS` に項目追加（`id` / `position` / `rotationY` / `width` / `height` / `videoUrl` / `url`）。同じ `id` で `i18n.js` の `destinations` に文言を追加するとナビボタンとMAPラベルに反映される
@@ -100,6 +102,7 @@
 - 動画看板の再生制御は `scene/video-billboards.js` の `updateVideoBillboardPlayback` で管理。村ビューでは再生し、MAP とタブ非表示時は pause する
 - イントロの見た目調整は `public/index.html` の `#intro-overlay` 周辺。ロゴ画像は `public/assets/image/intro-logo.jpg`
 - イントロ形成粒子は `scene/particle-field.js` で管理。粒子数、開始高度、分散範囲、パステル変換、地面先行表示との兼ね合い、形成完了後の停止は同ファイルと `main.js` の `PARTICLE_*` 定数で調整
+- 道路の経路と幅は `public/assets/js/site-config.js` の `ROAD_PATHS`、道路メッシュとアスファルト調テクスチャは `public/assets/js/scene/roads.js` で管理
 - 時計の表示・配置は `public/index.html` の `#tod-widget` と `.nav-left` 周辺
 - Languageメニューの見た目は `public/index.html` の `.language-menu` 周辺、言語一覧・代表タイムゾーン・文言は `public/assets/js/i18n.js`
 - コンパスの見た目・位置は `public/index.html` の `#compass-widget` 周辺、表示制御は `public/assets/js/main.js` の `syncUiState`
