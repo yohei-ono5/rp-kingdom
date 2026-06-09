@@ -38,14 +38,13 @@ Three.js を使った絵本風 3D 村の試作です。`public/assets/models/Fan
 - 村の導線が分かるよう、`ROAD_PATHS` に基づくアスファルト調の曲線道路を地面上に配置。道路上には木が生成されないよう、ツリー散布の除外エリアにも道路を反映
 - HOME 視点での奥行きを出すため、既存の北側林に加えて西側にも追加ツリー散布（`WEST_TREE_SCATTER`）を設定
 - 建物モデルは URL ごとにキャッシュしつつ並列読み込みするため、重いモデルがあっても他の建物の表示開始を待たせにくい
-- R2 上の `character.glb` を村の中央付近に配置し、GLBに含まれる歩行アニメーションを使って、端から端へ歩くNPC風の移動を実行。端に着くとランダムな時間だけ止まり、反対側へ戻る。建物・売地・看板には簡易障害物判定を付け、ぶつかりそうな場合は方向転換する
 - 売地/広告枠区画にホバーすると、区画名、価格、サイズ、説明をカーソル近くのパネルに表示し、区画が少し浮き上がる。クリックすると区画中心へズーム
 - 村ビューでは建物ホバー時にツールチップで建物名を表示、建物が僅かに拡大
 - `Language` メニューで `日本語` `English` `한국어` `Français` `繁體中文` を切り替え、選択言語は `localStorage` に保存
 - ドラッグとクリックを閾値（6px）で分離し、OrbitControls 操作中の誤反応を抑制
 - GLB 読み込み時に透明マテリアルを補正して、建物が透けにくい状態へ調整
 - 高DPI画面での負荷を抑えるため、レンダリング解像度（最大 1.35）とシャドウマップサイズ（1024）を制限
-- タブ非表示時は描画ループを停止し、通常アイドル時は 30fps 相当に間引く。イントロ、カメラ遷移、MAP、ポップアップ、操作直後は 60fps 相当に戻す
+- タブ非表示時は描画ループを停止し、通常アイドル時（MAP を含む）は 20fps 相当に間引く。イントロ、カメラ遷移、ポップアップ、操作直後は 60fps 相当に戻す
 - イントロの粒子形成が完了した後は粒子オブジェクトを非表示にし、更新処理を早期 return して常時負荷を下げる
 
 ## 起動
@@ -73,7 +72,6 @@ python3 -m http.server 5500
 - `public/assets/js/camera/transition-paths.js`: `intro-enter` / `map-enter` / `map-exit` のベジェ軌道生成
 - `public/assets/js/interaction/scene-interactions.js`: ポインタ/ホバー/クリック処理、ツールチップと売地パネルの出し分け、ナビボタン → 建物 or 看板の振り分け
 - `public/assets/js/scene/world-objects.js`: GLB 読み込み、モデル URL ごとのキャッシュ、並列読み込み、マテリアル補正、建物配置、MAP 用マーカー生成
-- `public/assets/js/scene/characters.js`: キャラクターGLBの読み込み、高さ正規化、地面合わせ、アニメーション再生、NPC風の往復移動、簡易障害物回避
 - `public/assets/js/scene/land-plots.js`: 売地/広告枠区画の3D生成とホバー/MAP 遷移の更新処理
 - `public/assets/js/scene/roads.js`: `ROAD_PATHS` の座標から曲線道路メッシュを生成し、CanvasTexture でアスファルト調の面を作成
 - `public/assets/js/scene/video-billboards.js`: 動画看板の3D生成（フレーム + スクリーン + 支柱）、`VideoTexture` 管理、autoplay フォールバック、村ビュー/MAP/タブ状態に応じた再生制御
@@ -96,7 +94,6 @@ python3 -m http.server 5500
 - 建物の配置（`position`）、スケール（`scale`）、向き（`rotationY`）を変える
 - 建物モデル（`modelUrl`）を差し替える
 - ドア位置とドアの向き（`doorOffset`, `doorFacing`）を微調整してフォーカスカメラとポップアップ位置を合わせる
-- キャラクターの配置、向き、高さ、移動範囲は `CHARACTERS` の `position` / `rotationY` / `height` / `movement` を変える
 - 売地/広告枠区画のサイズ、配置を変える
 - 道路の経路と幅は `ROAD_PATHS` の `points` / `width` を変える。木の配置は `TREE_SCATTER`（主に北側）と `WEST_TREE_SCATTER`（西側追加）を変える
 - 動画看板の `position` / `rotationY` / `width` / `height`、再生する動画 URL（`videoUrl`、R2 など外部 CDN 推奨）、遷移先 URL（`url`）を変える
@@ -156,18 +153,17 @@ python3 -m http.server 5500
 
 ## 大きなアセットの配信（Cloudflare R2）
 
-Cloudflare Pages / Workers Static Assets は単一ファイル 25 MiB までのため、`character.glb` や `windmill.glb` のような大きな GLB、動画看板用 mp4 は GitHub / Pages に置かず Cloudflare R2 から配信します。リポジトリ肥大、Pages のアップロード制限、デプロイ遅延を避けるためです。
+Cloudflare Pages / Workers Static Assets は単一ファイル 25 MiB までのため、`windmill.glb` のような大きな GLB、動画看板用 mp4 は GitHub / Pages に置かず Cloudflare R2 から配信します。リポジトリ肥大、Pages のアップロード制限、デプロイ遅延を避けるためです。
 
 ### R2 に置く対象
 
-- `character.glb`: `CHARACTER_MODEL_URL` で R2 URL を指定
 - `windmill.glb`: 40 MiB 前後あるため、本番では R2 にアップロードして `WINDMILL_MODEL_URL` を R2 URL に差し替える
 - 動画看板用 mp4: `YOUTUBE_PROMO_VIDEO_URL` などの URL 定数を R2 URL にする
 
 ### R2 セットアップ
 
 1. Cloudflare ダッシュボードで `R2 Object Storage` を開き、新規バケットを作成する（例: `rp-kingdom-media`）
-2. バケットに `3D_object/character.glb`、`3D_object/windmill.glb`、`youtube-promo.mp4` などをアップロードする
+2. バケットに `3D_object/windmill.glb`、`youtube-promo.mp4` などをアップロードする
 3. 本番ではバケットにカスタムドメインを接続する。暫定確認だけなら `r2.dev` の Public Development URL を有効化して使う
 4. 取得した公開 URL をブラウザで直接開き、`200 OK` でファイルが落ちることを確認する
 5. GLB / mp4 を外部ドメインから読むため、必要に応じて CORS ポリシーを設定する。動画を `THREE.VideoTexture` として WebGL テクスチャ化する場合は CORS が必要
@@ -189,7 +185,6 @@ Cloudflare Pages / Workers Static Assets は単一ファイル 25 MiB までの�
 
 ```js
 const WINDMILL_MODEL_URL = 'https://assets.example.com/3D_object/windmill.glb';
-const CHARACTER_MODEL_URL = 'https://assets.example.com/3D_object/character.glb';
 const YOUTUBE_PROMO_VIDEO_URL = 'https://assets.example.com/youtube-promo.mp4';
 ```
 
@@ -199,8 +194,6 @@ const YOUTUBE_PROMO_VIDEO_URL = 'https://assets.example.com/youtube-promo.mp4';
 - 既存の大きな GLB を差し替えるだけなら R2 バケットで同名ファイルを上書きアップロード（コード変更不要）
 - 別の URL に変える場合は `site-config.js` の URL 定数を更新
 - 動画看板を新規追加するなら `VIDEO_BILLBOARDS` 配列に項目追加
-
-現在のキャラクターモデル URL は `site-config.js` の `CHARACTER_MODEL_URL` で管理します。R2 側の `3D_object/character.glb` を差し替えた場合、同じファイル名ならコード変更は不要です。別名や別バケットにする場合はこの URL を更新してください。
 
 ## 動作確認ポイント
 

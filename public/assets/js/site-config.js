@@ -2,7 +2,6 @@ const STANDARD_HOUSE_MODEL_URL = new URL('../models/Fantasy_House_6.glb', import
 const ARTIST_HOUSE_MODEL_URL = new URL('../models/Fantasy_House.glb', import.meta.url).href;
 const TREE_MODEL_URL = new URL('../models/tree_LOD0.glb', import.meta.url).href;
 const YOUTUBE_PROMO_VIDEO_URL = 'https://pub-8c47d9817fce4e86a82d02fad188f8e8.r2.dev/youtube-promo.mp4';
-const CHARACTER_MODEL_URL = 'https://pub-8c47d9817fce4e86a82d02fad188f8e8.r2.dev/3D_object/character.glb';
 const WINDMILL_MODEL_URL = 'https://pub-8c47d9817fce4e86a82d02fad188f8e8.r2.dev/3D_object/windmill.glb';
 
 export const HOUSE_DESTINATIONS = [
@@ -111,30 +110,6 @@ export const ROAD_PATHS = [
       [20.0, 0, 2.2],
       [28.0, 0, 2.5]
     ]
-  }
-];
-
-export const CHARACTERS = [
-  {
-    id: 'main-character',
-    modelUrl: CHARACTER_MODEL_URL,
-    position: [7.2, 0, 2.8],
-    rotationY: -0.2,
-    height: 0.82,
-    animationIndex: 0,
-    movement: {
-      enabled: true,
-      bounds: {
-        minX: 2.0,
-        maxX: 8.4,
-        minZ: 1.8,
-        maxZ: 4.4
-      },
-      axis: 'x',
-      speedRange: [0.38, 0.52],
-      pauseRange: [0.05, 0.25],
-      facingOffset: -Math.PI / 2
-    }
   }
 ];
 

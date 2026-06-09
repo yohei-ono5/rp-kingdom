@@ -1,7 +1,6 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import {
-  CHARACTERS,
   FRONT_HOUSE_DESTINATION,
   HOUSE_DESTINATIONS,
   LAND_PLOTS,
@@ -20,7 +19,6 @@ import {
   resolveCameraTransitionMode
 } from './camera/transition-paths.js';
 import { loadWorldObjects, renderDestinationButtons } from './scene/world-objects.js';
-import { createCharacterObstacles, initCharacters, updateCharacterAnimations } from './scene/characters.js';
 import { initLandPlots, updateLandPlotLanguage, updateLandPlots } from './scene/land-plots.js';
 import { initRoads } from './scene/roads.js';
 import { createTreeExclusions, initTrees } from './scene/trees.js';
@@ -164,8 +162,6 @@ const mapLabelMeta = [];
 const landPlotTargets = [];
 const landPlotMeta = [];
 const videoBillboardTargets = [];
-const characterActors = [];
-const characterMixers = [];
 const animationClock = new THREE.Clock();
 const revealMaterialStates = new WeakMap();
 
@@ -563,17 +559,6 @@ try {
   console.error('Failed to initialize video billboards.', error);
 }
 refreshParticleFormationTargets();
-void initCharacters({
-  characters: CHARACTERS,
-  parentGroup: sceneryGroup,
-  mixers: characterMixers,
-  actors: characterActors,
-  obstacles: createCharacterObstacles({
-    houses: [...HOUSE_DESTINATIONS, FRONT_HOUSE_DESTINATION],
-    plots: LAND_PLOTS,
-    billboards: VIDEO_BILLBOARDS
-  })
-});
 const treeExclusions = createTreeExclusions({
   houses: [...HOUSE_DESTINATIONS, FRONT_HOUSE_DESTINATION],
   plots: LAND_PLOTS,
@@ -1229,7 +1214,7 @@ function animate(timestamp) {
   lastFrameTime = timestamp;
   startAnimationLoop();
 
-  const deltaTime = animationClock.getDelta();
+  animationClock.getDelta();
 
   timeOfDay.update();
 
@@ -1261,11 +1246,6 @@ function animate(timestamp) {
     currentHoverPlot: interaction.getCurrentHoverPlot(),
     viewTransitionProgress: viewTransition.progress
   });
-  updateCharacterAnimations({
-    mixers: characterMixers,
-    actors: characterActors,
-    deltaTime
-  });
   updateVideoBillboardPlayback({
     billboards: videoBillboardTargets,
     pageVisible,
@@ -1285,7 +1265,6 @@ function shouldUseActiveFrameRate(timestamp) {
     || cameraTransition.active
     || getParticleFormationProgress(getParticleFormationElapsed()) < 1
     || popup.isOpen()
-    || currentView === 'map'
     || timestamp - lastInteractionAt < INTERACTION_ACTIVE_WINDOW;
 }
 
