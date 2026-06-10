@@ -26,7 +26,7 @@
 ### アセット
 - `public/assets/models/Fantasy_House_6.glb`: 通常の建物（Company / Music / Store）
 - `public/assets/models/Fantasy_House.glb`: 前面のアーティストハウス（Artist）
-- `public/assets/models/windmill.glb`: SNS 用の風車
+- `public/assets/models/windmill_2048_ktx2.glb`: SNS 用のKTX2圧縮済み風車。`windmill.glb` と `windmill_2048.glb` はローカル変換用で `.gitignore` 対象
 - `public/assets/image/intro-logo.jpg`: イントロ画面のロゴ画像
 - `public/assets/videos/`: 動画看板用 mp4 のローカル置き場（`.gitignore` で除外、本番は Cloudflare R2 から配信）
 - `resources/models/tree_LOD0.glb`: 未使用アセット
@@ -35,6 +35,7 @@
 
 - 初回表示は雲に包まれたイントロ画面で、`ENTER` ボタンまたは Enter キーで降下開始。MAP 高度（y=75）から HOME 位置までベジェで降下する `intro-enter` 遷移
 - `ENTER` 後は上空から降るパステル粒子が家・看板・地面へ集まって世界を形成する。地面だけは薄く先行表示し、降下時の距離感を補助する。形成完了後の粒子は非表示になり更新処理も止まる
+- 世界形成の不透明度制御対象は初期化時にマテリアル配列へキャッシュする。形成中だけ配列を更新し、完了時に元のマテリアル設定へ戻して以後の処理を停止する
 - 上ナビ左側に `ARTIST NAME` ブロック + 時計、右側に `HOME` + 動的生成されるナビボタン（`Artist` `Company` `Music` `SNS` `Store` `Youtube`）+ `MAP` + `Language`
 - `HOME` は南側寄りの通常村ビュー（`cameraState.village`）に戻る
 - 各ナビボタン／3D オブジェクトのクリックはどちらも、対象前までズーム → 少し待って確認ポップアップ → 移動またはキャンセル
@@ -48,14 +49,15 @@
 - `?hour=<0-23>` クエリで時刻を固定できる（テスト用）
 - 夜間は星空（カメラ追従の Points）と月（Sprite ハロー付き）がフェードイン
 - 夜間は各ハウスに窓明かり/玄関ランタンの `PointLight` が自動で灯る（`timeOfDayState.sunIntensity` を元にした nightFactor で減衰、MAP 時は弱める）
-- `Fantasy_House_6.glb` を使う通常ハウス（Company / Music / Store）は約1.5倍に拡大。SNS は `windmill.glb` を使い、Musicハウスとの干渉を避けるため西側（X=-20.4）へ配置
+- `Fantasy_House_6.glb` を使う通常ハウス（Company / Music / Store）は約1.5倍に拡大。SNS は `windmill_2048_ktx2.glb` を使い、Musicハウスとの干渉を避けるため西側（X=-20.4）へ配置
 - ドアフォーカスは建物ごとの `doorOffset` / `doorFacing` で調整。Artist は西側入口（`doorFacing: [-1, 0, 0]`）、SNS 風車は北側入口（`doorFacing: [0, 0, -1]`）
 - 動画看板（`VIDEO_BILLBOARDS`）は Music ハウスの南側に配置、画面が南向きで `MeshBasicMaterial` + `VideoTexture` により時間帯に左右されず自発光表示。クリック / `Youtube` ナビボタン / MAPラベルで看板正面にカメラがズームして確認ポップアップから外部リンク（YouTube）へ
 - 動画看板は通常の村ビュー中のみ再生し、MAP 表示中やタブ非表示時は pause して `VideoTexture` のデコード/更新負荷を抑える
 - 売地/広告枠区画は `FOR SALE` 看板、境界線、杭で構成した 3D オブジェクトとして表示。Artist 北側にあった `A-02` は削除済み
 - 村の主要導線として `ROAD_PATHS` に沿ったアスファルト調の曲線道路を配置。道路上に木が生成されないよう、道路区間をカプセル状のツリー除外エリアとして扱う
 - HOME 視点の見栄えを補うため、北側の `TREE_SCATTER` に加えて西側に `WEST_TREE_SCATTER` を追加配置
-- 建物モデルは URL ごとにキャッシュしつつ並列で読み込むので、`windmill.glb` のような重いモデルが他の建物の表示開始をブロックしにくい
+- `TREE_SCATTER` と `WEST_TREE_SCATTER` が同じモデルURLを使う場合、`scene/trees.js` が読込Promiseを共有し、GLBの通信・解析を1回だけ実行する
+- 建物モデルは URL ごとにキャッシュしつつ並列で読み込むので、風車のような重いモデルが他の建物の表示開始をブロックしにくい
 - PC では売地/広告枠区画ホバーで右下パネルに詳細を表示し、区画が僅かに浮き上がる
 - スマホ（タッチ入力）では区画タップで詳細パネルを固定表示。同じ区画の再タップ or 他の場所タップで閉じる
 - 村ビューでは建物ホバー時に建物名ツールチップを表示、建物が 1.04 倍にスケール
@@ -91,10 +93,14 @@
 - 新しい建物モデルを追加する場合は `modelUrl` と `doorOffset` / `doorFacing` をセットで定義（フォーカスカメラとポップアップ位置に直結）
 - 新しい動画看板を追加する場合は `VIDEO_BILLBOARDS` に項目追加（`id` / `position` / `rotationY` / `width` / `height` / `videoUrl` / `url`）。同じ `id` で `i18n.js` の `destinations` に文言を追加するとナビボタンとMAPラベルに反映される
 - 動画ファイルは Cloudflare R2 にホストし、`site-config.js` の URL 定数（`YOUTUBE_PROMO_VIDEO_URL` 等）を R2 の公開 URL に差し替え。ローカル開発用に `public/assets/videos/` に同名 mp4 を置いてもよい（`.gitignore` で除外済み）
-- 大きな3Dモデルも Cloudflare R2 にホストする。`windmill.glb` は Pages の単一ファイル 25 MiB 制限を超えるため、本番では `WINDMILL_MODEL_URL` を R2 URL に差し替える
+- 風車は2048pxテクスチャをKTX2/Basis圧縮した `public/assets/models/windmill_2048_ktx2.glb` をCloudflare Pagesから直接配信する
+- KTX2テクスチャは `scene/world-objects.js` の `KTX2Loader` で読み込み、Three.js 0.158.0のBasisトランスコーダーを使用する
+- 旧R2オブジェクト `3D_object/windmill.glb` は現在参照していない。本番でKTX2版を確認し、他サイトからの参照がなければ削除可能
 - R2 の CORS ポリシーは `AllowedMethods: ["GET", "HEAD"]` を許可。`AllowedOrigins` は本番 Pages ドメインに絞る。preview が多い開発中だけ `["*"]` を一時利用してよい
 - 動画要素は `crossOrigin = 'anonymous'` 必須（R2 など外部 CDN から WebGL に流すため）
-- 動画看板の再生制御は `scene/video-billboards.js` の `updateVideoBillboardPlayback` で管理。村ビューでは再生し、MAP とタブ非表示時は pause する
+- 動画看板の再生制御は `scene/video-billboards.js` の `updateVideoBillboardPlayback` で管理。初期モデル読み込みとイントロ形成演出の完了後にだけ `src` を設定してロードし、村ビュー中は再生する。MAPとタブ非表示時は pause する
+- R2 の動画オブジェクトには `Content-Type: video/mp4` と `Cache-Control: public, max-age=31536000, immutable` を設定する。動画更新時はキャッシュ更新のためファイル名と `site-config.js` の URL を変更する
+- 動画はアップロード前に `ffmpeg -i input.mp4 -vf "scale=-2:720" -c:v libx264 -crf 23 -preset medium -c:a aac -b:a 128k -movflags +faststart output.mp4` などで軽量化し、moov atom を先頭へ移動する
 - イントロの見た目調整は `public/index.html` の `#intro-overlay` 周辺。ロゴ画像は `public/assets/image/intro-logo.jpg`
 - イントロ形成粒子は `scene/particle-field.js` で管理。粒子数、開始高度、分散範囲、パステル変換、地面先行表示との兼ね合い、形成完了後の停止は同ファイルと `main.js` の `PARTICLE_*` 定数で調整
 - 道路の経路と幅は `public/assets/js/site-config.js` の `ROAD_PATHS`、道路メッシュとアスファルト調テクスチャは `public/assets/js/scene/roads.js` で管理

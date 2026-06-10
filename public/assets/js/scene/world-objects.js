@@ -1,6 +1,9 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { KTX2Loader } from 'three/addons/loaders/KTX2Loader.js';
 import { DEFAULT_DOOR_FACING, DEFAULT_DOOR_OFFSET } from '../camera/focus-camera.js';
+
+const KTX2_TRANSCODER_PATH = 'https://unpkg.com/three@0.158.0/examples/jsm/libs/basis/';
 
 export function renderDestinationButtons(destinations, viewNav, { getLabel } = {}) {
   if (!viewNav) return;
@@ -19,6 +22,7 @@ export function renderDestinationButtons(destinations, viewNav, { getLabel } = {
 
 export async function loadWorldObjects({
   objects,
+  renderer,
   villageGroup,
   mapOverlayGroup,
   overlayMaterials,
@@ -26,7 +30,11 @@ export async function loadWorldObjects({
   houseMaterials,
   houseLights
 }) {
+  const ktx2Loader = new KTX2Loader()
+    .setTranscoderPath(KTX2_TRANSCODER_PATH)
+    .detectSupport(renderer);
   const loader = new GLTFLoader();
+  loader.setKTX2Loader(ktx2Loader);
   const templateCache = new Map();
 
   const loadTemplate = (url) => {
@@ -44,27 +52,31 @@ export async function loadWorldObjects({
     return request;
   };
 
-  await Promise.all(objects.map(async (data) => {
-    if (!data.modelUrl) {
-      console.error(`Missing modelUrl for object "${data.id}".`);
-      return;
-    }
+  try {
+    await Promise.all(objects.map(async (data) => {
+      if (!data.modelUrl) {
+        console.error(`Missing modelUrl for object "${data.id}".`);
+        return;
+      }
 
-    try {
-      const template = await loadTemplate(data.modelUrl);
-      addWorldObject({
-        template,
-        data,
-        villageGroup,
-        mapOverlayGroup,
-        overlayMaterials,
-        mapMarkerMeta,
-        houseLights
-      });
-    } catch (error) {
-      console.error(`Failed to load model for object "${data.id}".`, error);
-    }
-  }));
+      try {
+        const template = await loadTemplate(data.modelUrl);
+        addWorldObject({
+          template,
+          data,
+          villageGroup,
+          mapOverlayGroup,
+          overlayMaterials,
+          mapMarkerMeta,
+          houseLights
+        });
+      } catch (error) {
+        console.error(`Failed to load model for object "${data.id}".`, error);
+      }
+    }));
+  } finally {
+    ktx2Loader.dispose();
+  }
 }
 
 function addWorldObject({

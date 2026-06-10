@@ -1,6 +1,6 @@
 # RP_kingdom
 
-Three.js を使った絵本風 3D 村の試作です。`public/assets/models/Fantasy_House_6.glb`、`public/assets/models/Fantasy_House.glb`、`public/assets/models/windmill.glb` を配置し、通常ビューと MAP ビューを切り替えられる構成にしています。Cloudflare Pages で公開する静的サイトですが、25 MiB を超える GLB / mp4 は Cloudflare R2 から配信する想定です。
+Three.js を使った絵本風 3D 村の試作です。`public/assets/models/Fantasy_House_6.glb`、`public/assets/models/Fantasy_House.glb`、`public/assets/models/windmill_2048_ktx2.glb` を配置し、通常ビューと MAP ビューを切り替えられる構成にしています。Cloudflare Pages で公開する静的サイトですが、大きな GLB / mp4 は Cloudflare R2 から配信する想定です。
 
 ## 現在の構成
 
@@ -20,7 +20,7 @@ Three.js を使った絵本風 3D 村の試作です。`public/assets/models/Fan
 
 ### 見え方と演出
 
-- `Artist` だけ別モデル（`Fantasy_House.glb`）、`SNS` は風車モデル（`windmill.glb`）、他の建物（Company / Music / Store）は共通モデル（`Fantasy_House_6.glb`）を使用
+- `Artist` だけ別モデル（`Fantasy_House.glb`）、`SNS` はKTX2圧縮した風車モデル（`windmill_2048_ktx2.glb`）、他の建物（Company / Music / Store）は共通モデル（`Fantasy_House_6.glb`）を使用
 - `Fantasy_House_6.glb` を使う通常ハウスは初期値から約1.5倍に拡大し、SNSの風車はMusicハウスとの干渉を避けるため西側（X=-20.4）へ配置
 - `Artist` の入口は西側、`SNS` 風車の入口は北側、通常ハウスは各モデルの玄関側に合わせて `doorOffset` / `doorFacing` を個別設定
 - `HOME` 視点は `cameraState.village` で、現在は南側寄りから村全体を見下ろす位置に設定。通常ビューのフォグは引き視点でも白くなりすぎないよう `48/130` に調整
@@ -34,9 +34,11 @@ Three.js を使った絵本風 3D 村の試作です。`public/assets/models/Fan
 - 動画看板は通常の村ビュー中のみ再生し、MAP 表示中やタブ非表示時は pause して `VideoTexture` の更新負荷を抑える
 - 動画ファイル本体は Cloudflare R2 にホストし、CORS 経由で WebGL テクスチャに使用（リポジトリには含めない）
 - `ENTER` 後は上空から降る粒子が家・看板・地面へ集まって世界を形作り、地面だけを薄く先行表示して降下時の距離感を補助
+- 世界形成中の表示対象マテリアルは初期化時にキャッシュし、形成完了後は元の設定へ戻して更新処理を停止する
 - 村の空きスペースに `FOR SALE` 看板付きの売地/広告枠区画を配置（境界線、杭、看板、立て札の3Dオブジェクト）。Artist 北側にあった `A-02` 区画は削除済み
 - 村の導線が分かるよう、`ROAD_PATHS` に基づくアスファルト調の曲線道路を地面上に配置。道路上には木が生成されないよう、ツリー散布の除外エリアにも道路を反映
 - HOME 視点での奥行きを出すため、既存の北側林に加えて西側にも追加ツリー散布（`WEST_TREE_SCATTER`）を設定
+- 北側と西側の木は同じ `tree_LOD0.glb` の読込・解析結果を共有し、GLBの二重ロードを避ける
 - 建物モデルは URL ごとにキャッシュしつつ並列読み込みするため、重いモデルがあっても他の建物の表示開始を待たせにくい
 - 売地/広告枠区画にホバーすると、区画名、価格、サイズ、説明をカーソル近くのパネルに表示し、区画が少し浮き上がる。クリックすると区画中心へズーム
 - 村ビューでは建物ホバー時にツールチップで建物名を表示、建物が僅かに拡大
@@ -79,7 +81,7 @@ python3 -m http.server 5500
 - `public/assets/js/scene/sky-objects.js`: 夜の星空と月（カメラ追従）の生成と表示制御
 - `public/assets/js/systems/time-of-day.js`: `Asia/Tokyo` の取得、時間帯ライティング/太陽位置補間、時計 UI 更新
 - `public/assets/js/ui/link-popup.js`: 建物ドア／看板上に追従する確認ポップアップの生成と表示制御。単一リンクと複数リンク選択（Music の `Spotify` / `Apple Music`）に対応
-- `public/assets/models/`: GLB アセット（`Fantasy_House_6.glb`, `Fantasy_House.glb`, `windmill.glb`, `tree_LOD0.glb`）
+- `public/assets/models/`: 配信するGLBアセット（`Fantasy_House_6.glb`, `Fantasy_House.glb`, `windmill_2048_ktx2.glb`, `tree_LOD0.glb`）。`windmill.glb` と `windmill_2048.glb` はローカル変換用で `.gitignore` 対象
 - `public/assets/videos/`: 動画看板用 mp4 のローカル置き場（`*.mp4` は `.gitignore` で除外、本番は Cloudflare R2 から配信）
 - `resources/`: 公開対象に含めない素材置き場
 - `docs/`: 開発メモ
@@ -118,9 +120,11 @@ python3 -m http.server 5500
 - 確認ポップアップは `ui/link-popup.js` が DOM を生成し、毎フレーム `updatePosition` でドア位置に追従
 - 建物クリック時のフォーカス位置は `camera/focus-camera.js` の `applyFocusCamera`（ドアから前に出て少し上から見下ろす）。売地/広告枠区画は `main.js` の `applyPlotFocusCamera` で区画中心へズーム
 - 動画看板の見た目（フレーム / スクリーン / 支柱の素材・サイズ）は `scene/video-billboards.js` の定数とマテリアル定義
-- 動画看板の再生制御は `scene/video-billboards.js` の `updateVideoBillboardPlayback` で管理。村ビューでは再生し、MAP とタブ非表示時は pause する
+- 動画看板の再生制御は `scene/video-billboards.js` の `updateVideoBillboardPlayback` で管理。初期モデル読み込みとイントロ形成演出が落ち着いてから初回ロードし、村ビュー中は再生する。MAPとタブ非表示時は pause する
 - 動画看板のフォーカス距離は `main.js` の `BILLBOARD_FOCUS_DISTANCE`、配置・回転は `site-config.js` の `VIDEO_BILLBOARDS`
 - イントロ形成粒子は `scene/particle-field.js` で管理。粒子数、開始高度、分散範囲、パステル変換、形成完了後の停止は同ファイルの定数と `update` で調整
+- 世界形成時の不透明度制御は `main.js` の `refreshWorldRevealMaterials` / `updateWorldReveal` で管理。対象の全シーン走査は初期化・非同期モデル追加時だけ行い、形成完了後は処理を終了する
+- 木モデルは `scene/trees.js` でURLごとの読込Promiseをキャッシュし、複数の散布設定でジオメトリとマテリアルを共有する
 - 描画ループの負荷制御は `main.js` の `ACTIVE_FRAME_INTERVAL` / `IDLE_FRAME_INTERVAL` / `INTERACTION_ACTIVE_WINDOW` と `bindRenderPerformanceEvents` / `shouldUseActiveFrameRate` で管理
 - コンパスの見た目・配置は `public/index.html` の `#compass-widget` 周辺、表示制御は `main.js` の `syncUiState`
 
@@ -151,22 +155,23 @@ python3 -m http.server 5500
 - 以後は `main` に push すると自動で本番更新される
 - 独自ドメインを使う場合は Pages プロジェクトの `Custom domains` から追加する
 
-## 大きなアセットの配信（Cloudflare R2）
+## 動画アセットの配信（Cloudflare R2）
 
-Cloudflare Pages / Workers Static Assets は単一ファイル 25 MiB までのため、`windmill.glb` のような大きな GLB、動画看板用 mp4 は GitHub / Pages に置かず Cloudflare R2 から配信します。リポジトリ肥大、Pages のアップロード制限、デプロイ遅延を避けるためです。
+風車の配信版 `windmill_2048_ktx2.glb` は2048pxテクスチャをKTX2/Basis圧縮しており、Cloudflare Pagesから直接配信します。動画看板用 mp4 はリポジトリ肥大とデプロイ遅延を避けるため、Cloudflare R2から配信します。
+
+旧構成でR2に置いていた `3D_object/windmill.glb` は現在のコードから参照していません。本番デプロイでKTX2版の表示を確認後、ほかのサイトからも参照されていなければ削除できます。
 
 ### R2 に置く対象
 
-- `windmill.glb`: 40 MiB 前後あるため、本番では R2 にアップロードして `WINDMILL_MODEL_URL` を R2 URL に差し替える
 - 動画看板用 mp4: `YOUTUBE_PROMO_VIDEO_URL` などの URL 定数を R2 URL にする
 
 ### R2 セットアップ
 
 1. Cloudflare ダッシュボードで `R2 Object Storage` を開き、新規バケットを作成する（例: `rp-kingdom-media`）
-2. バケットに `3D_object/windmill.glb`、`youtube-promo.mp4` などをアップロードする
+2. バケットに `youtube-promo_720p.mp4` などをアップロードする
 3. 本番ではバケットにカスタムドメインを接続する。暫定確認だけなら `r2.dev` の Public Development URL を有効化して使う
 4. 取得した公開 URL をブラウザで直接開き、`200 OK` でファイルが落ちることを確認する
-5. GLB / mp4 を外部ドメインから読むため、必要に応じて CORS ポリシーを設定する。動画を `THREE.VideoTexture` として WebGL テクスチャ化する場合は CORS が必要
+5. 動画を外部ドメインから読み、`THREE.VideoTexture` としてWebGLテクスチャ化するため、必要に応じてCORSポリシーを設定する
 
 ```json
 [
@@ -184,14 +189,26 @@ Cloudflare Pages / Workers Static Assets は単一ファイル 25 MiB までの�
 6. `public/assets/js/site-config.js` の URL 定数を R2 の公開 URL に差し替える
 
 ```js
-const WINDMILL_MODEL_URL = 'https://assets.example.com/3D_object/windmill.glb';
-const YOUTUBE_PROMO_VIDEO_URL = 'https://assets.example.com/youtube-promo.mp4';
+const YOUTUBE_PROMO_VIDEO_URL = 'https://assets.example.com/youtube-promo_720p.mp4';
+```
+
+動画はアップロード前に先頭再生用のメタデータをファイル先頭へ移動し、必要に応じて 720p などへ縮小します。
+
+```sh
+ffmpeg -i input.mp4 -vf "scale=-2:720" -c:v libx264 -crf 23 -preset medium \
+  -c:a aac -b:a 128k -movflags +faststart youtube-promo_720p.mp4
+```
+
+R2 の動画オブジェクトには HTTP メタデータとして次を設定します。ファイル名を変えずに内容を差し替える運用では `immutable` により古い動画が残るため、更新時は URL のファイル名も変更してください。
+
+```text
+Cache-Control: public, max-age=31536000, immutable
+Content-Type: video/mp4
 ```
 
 ### 差し替え / 追加
 
-- 既存の動画を差し替えるだけなら R2 バケットで同名ファイルを上書きアップロード（コード変更不要）
-- 既存の大きな GLB を差し替えるだけなら R2 バケットで同名ファイルを上書きアップロード（コード変更不要）
+- 既存の動画を差し替える場合は、長期キャッシュを確実に更新するためファイル名を変更し、`site-config.js` の URL も更新
 - 別の URL に変える場合は `site-config.js` の URL 定数を更新
 - 動画看板を新規追加するなら `VIDEO_BILLBOARDS` 配列に項目追加
 

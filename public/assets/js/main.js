@@ -164,6 +164,8 @@ const landPlotMeta = [];
 const videoBillboardTargets = [];
 const animationClock = new THREE.Clock();
 const revealMaterialStates = new WeakMap();
+const revealMaterialTargets = [];
+let worldRevealComplete = false;
 
 const ui = {
   introOverlay: document.getElementById('intro-overlay'),
@@ -206,6 +208,7 @@ let introActive = true;
 let particleFormationStartedAt = 0;
 let animationFrameId = 0;
 let pageVisible = document.visibilityState !== 'hidden';
+let videoPlaybackReady = false;
 let lastFrameTime = 0;
 let lastInteractionAt = performance.now();
 const BILLBOARD_FOCUS_DISTANCE = 5.5;
@@ -572,6 +575,8 @@ const treeExclusions = createTreeExclusions({
     treeConfig,
     parentGroup: sceneryGroup,
     exclusions: treeExclusions
+  }).then(() => {
+    refreshWorldRevealMaterials();
   }).catch((error) => {
     console.error('Failed to initialize trees.', error);
   });
@@ -579,6 +584,7 @@ const treeExclusions = createTreeExclusions({
 rebuildMapLabels();
 void loadWorldObjects({
   objects: [...HOUSE_DESTINATIONS, FRONT_HOUSE_DESTINATION],
+  renderer,
   villageGroup,
   mapOverlayGroup,
   overlayMaterials,
@@ -589,7 +595,9 @@ void loadWorldObjects({
   updateWorldObjectTranslations();
   rebuildMapLabels();
   refreshParticleFormationTargets();
+  refreshWorldRevealMaterials();
 });
+refreshWorldRevealMaterials();
 interaction.bindEvents();
 bindRenderPerformanceEvents();
 bindLanguageEvents();
@@ -636,6 +644,7 @@ function closeLinkPopup() {
 function bindRenderPerformanceEvents() {
   document.addEventListener('visibilitychange', () => {
     pageVisible = document.visibilityState !== 'hidden';
+    updateVideoPlaybackState();
 
     if (pageVisible) {
       animationClock.getDelta();
@@ -1228,6 +1237,9 @@ function animate(timestamp) {
   updateViewTransition();
   const particleFormationElapsed = getParticleFormationElapsed();
   const particleFormationProgress = getParticleFormationProgress(particleFormationElapsed);
+  if (!videoPlaybackReady && !introActive && particleFormationProgress >= 1) {
+    videoPlaybackReady = true;
+  }
   skyObjects.update({
     timeOfDayState,
     camera,
@@ -1246,11 +1258,7 @@ function animate(timestamp) {
     currentHoverPlot: interaction.getCurrentHoverPlot(),
     viewTransitionProgress: viewTransition.progress
   });
-  updateVideoBillboardPlayback({
-    billboards: videoBillboardTargets,
-    pageVisible,
-    currentView
-  });
+  updateVideoPlaybackState();
   updateWorldReveal(particleFormationProgress);
   updateFocusPopup();
 
@@ -1258,6 +1266,15 @@ function animate(timestamp) {
   updatePopupAnchor();
   updateMapLabels();
   renderer.render(scene, camera);
+}
+
+function updateVideoPlaybackState() {
+  updateVideoBillboardPlayback({
+    billboards: videoBillboardTargets,
+    pageVisible,
+    currentView,
+    playbackReady: videoPlaybackReady
+  });
 }
 
 function shouldUseActiveFrameRate(timestamp) {
@@ -1285,6 +1302,10 @@ function getParticleFormationProgress(elapsed) {
 }
 
 function updateWorldReveal(formationProgress) {
+  if (worldRevealComplete) {
+    return;
+  }
+
   const revealOpacity = introActive
     ? 0
     : THREE.MathUtils.smoothstep(
@@ -1293,21 +1314,49 @@ function updateWorldReveal(formationProgress) {
       PARTICLE_WORLD_REVEAL_END
     );
 
+  revealMaterialTargets.forEach(({ material, minimumOpacity }) => {
+    applyRevealOpacity(material, Math.max(minimumOpacity, revealOpacity));
+  });
+
+  if (!introActive && formationProgress >= 1) {
+    revealMaterialTargets.forEach(({ material }) => restoreRevealMaterial(material));
+    revealMaterialTargets.length = 0;
+    worldRevealComplete = true;
+  }
+}
+
+function refreshWorldRevealMaterials() {
+  if (worldRevealComplete) {
+    return;
+  }
+
+  const materialTargets = new Map();
   [
-    { subject: ground, opacity: Math.max(INTRO_GROUND_PREVIEW_OPACITY, revealOpacity) },
-    { subject: villageGroup, opacity: revealOpacity },
-    { subject: mapOverlayGroup, opacity: revealOpacity },
-    { subject: roadGroup, opacity: revealOpacity },
-    { subject: sceneryGroup, opacity: revealOpacity },
-    { subject: landPlotGroup, opacity: revealOpacity },
-    { subject: videoBillboardGroup, opacity: revealOpacity }
-  ].filter(({ subject }) => Boolean(subject)).forEach(({ subject, opacity }) => {
+    { subject: ground, minimumOpacity: INTRO_GROUND_PREVIEW_OPACITY },
+    { subject: villageGroup, minimumOpacity: 0 },
+    { subject: mapOverlayGroup, minimumOpacity: 0 },
+    { subject: roadGroup, minimumOpacity: 0 },
+    { subject: sceneryGroup, minimumOpacity: 0 },
+    { subject: landPlotGroup, minimumOpacity: 0 },
+    { subject: videoBillboardGroup, minimumOpacity: 0 }
+  ].filter(({ subject }) => Boolean(subject)).forEach(({ subject, minimumOpacity }) => {
     subject.traverse?.((child) => {
       if ((!child.isMesh && !child.isLine && !child.isPoints) || !child.material) return;
       const materials = Array.isArray(child.material) ? child.material : [child.material];
-      materials.forEach((material) => applyRevealOpacity(material, opacity));
+      materials.forEach((material) => {
+        materialTargets.set(
+          material,
+          Math.max(materialTargets.get(material) || 0, minimumOpacity)
+        );
+      });
     });
   });
+
+  revealMaterialTargets.length = 0;
+  materialTargets.forEach((minimumOpacity, material) => {
+    revealMaterialTargets.push({ material, minimumOpacity });
+  });
+  updateWorldReveal(getParticleFormationProgress(getParticleFormationElapsed()));
 }
 
 function applyRevealOpacity(material, revealOpacity) {
@@ -1334,6 +1383,21 @@ function applyRevealOpacity(material, revealOpacity) {
   }
 
   material.opacity = original.opacity * revealOpacity;
+  if (needsUpdate) material.needsUpdate = true;
+}
+
+function restoreRevealMaterial(material) {
+  const original = revealMaterialStates.get(material);
+  if (!original) return;
+
+  let needsUpdate = false;
+  needsUpdate = setMaterialFlag(material, 'transparent', original.transparent) || needsUpdate;
+  needsUpdate = setMaterialFlag(material, 'depthWrite', original.depthWrite) || needsUpdate;
+  if ('alphaHash' in material) {
+    needsUpdate = setMaterialFlag(material, 'alphaHash', original.alphaHash) || needsUpdate;
+  }
+  needsUpdate = setMaterialFlag(material, 'alphaTest', original.alphaTest) || needsUpdate;
+  material.opacity = original.opacity;
   if (needsUpdate) material.needsUpdate = true;
 }
 

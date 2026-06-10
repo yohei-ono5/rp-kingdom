@@ -13,6 +13,7 @@ const tempPosition = new THREE.Vector3();
 const tempQuaternion = new THREE.Quaternion();
 const tempEuler = new THREE.Euler();
 const tempScale = new THREE.Vector3();
+const treeTemplateCache = new Map();
 
 export async function initTrees({
   treeConfig,
@@ -23,10 +24,7 @@ export async function initTrees({
     return [];
   }
 
-  const loader = new GLTFLoader();
-  const model = await loadModelScene(loader, treeConfig.modelUrl);
-  prepareTreeTemplate(model);
-  centerModelOnGround(model);
+  const model = await loadTreeTemplate(treeConfig.modelUrl);
 
   const placements = generateTreePlacements({
     treeConfig,
@@ -258,6 +256,28 @@ function centerModelOnGround(modelRoot) {
 
   modelRoot.position.sub(center);
   modelRoot.position.y += size.y / 2;
+}
+
+function loadTreeTemplate(url) {
+  const cached = treeTemplateCache.get(url);
+  if (cached) {
+    return cached;
+  }
+
+  const loader = new GLTFLoader();
+  const request = loadModelScene(loader, url)
+    .then((model) => {
+      prepareTreeTemplate(model);
+      centerModelOnGround(model);
+      return model;
+    })
+    .catch((error) => {
+      treeTemplateCache.delete(url);
+      throw error;
+    });
+
+  treeTemplateCache.set(url, request);
+  return request;
 }
 
 function loadModelScene(loader, url) {

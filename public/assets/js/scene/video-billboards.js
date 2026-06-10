@@ -4,7 +4,6 @@ const SCREEN_FORWARD_OFFSET = 0.025;
 const FRAME_DEPTH = 0.15;
 const FRAME_THICKNESS = 0.18;
 const POST_RADIUS = 0.07;
-const AUTOPLAY_PRELOAD_TIMEOUT = 1600;
 
 const pendingPlayback = [];
 let gestureListenerBound = false;
@@ -77,15 +76,16 @@ function createBillboard(data) {
     width,
     height,
     video,
+    videoUrl: data.videoUrl,
     texture,
     shouldPlayVideo: false,
-    videoPlaybackRequested: false
+    videoSourceLoaded: false
   };
 
   return wrapper;
 }
 
-function createVideoElement(src) {
+function createVideoElement(videoUrl) {
   const video = document.createElement('video');
   video.loop = true;
   video.muted = true;
@@ -94,20 +94,13 @@ function createVideoElement(src) {
   video.setAttribute('playsinline', '');
   video.setAttribute('webkit-playsinline', '');
   video.autoplay = false;
-  video.preload = 'auto';
+  video.preload = 'none';
   video.crossOrigin = 'anonymous';
   video.style.display = 'none';
-  video.src = src;
   document.body.appendChild(video);
 
-  window.setTimeout(() => {
-    if (!video.paused) {
-      video.pause();
-    }
-  }, AUTOPLAY_PRELOAD_TIMEOUT);
-
   video.addEventListener('error', () => {
-    console.warn(`Video element failed to load: ${src}`);
+    console.warn(`Video element failed to load: ${videoUrl}`);
   });
 
   return video;
@@ -149,7 +142,7 @@ function ensureGestureFallback() {
       if (!video.dataset.playbackRequested) {
         continue;
       }
-      video.play().catch(() => {});
+      requestVideoPlayback(video);
     }
   };
 
@@ -160,7 +153,8 @@ function ensureGestureFallback() {
 export function updateVideoBillboardPlayback({
   billboards,
   pageVisible = true,
-  currentView = 'village'
+  currentView = 'village',
+  playbackReady = true
 }) {
   if (!Array.isArray(billboards)) return;
 
@@ -168,42 +162,54 @@ export function updateVideoBillboardPlayback({
     const video = billboard.userData?.video;
     if (!video) return;
 
-    const shouldPlay = pageVisible && currentView === 'village';
+    const shouldPlay =
+      pageVisible
+      && currentView === 'village'
+      && playbackReady;
 
+    if (billboard.userData.shouldPlayVideo === shouldPlay) {
+      return;
+    }
     billboard.userData.shouldPlayVideo = shouldPlay;
 
     if (shouldPlay) {
       playVideo(video, billboard);
     } else {
-      pauseVideo(video, billboard);
+      pauseVideo(video);
     }
   });
 }
 
 function playVideo(video, billboard) {
-  if (billboard.userData.videoPlaybackRequested && !video.paused) {
-    return;
+  if (!billboard.userData.videoSourceLoaded) {
+    video.src = billboard.userData.videoUrl;
+    video.load();
+    billboard.userData.videoSourceLoaded = true;
   }
 
-  billboard.userData.videoPlaybackRequested = true;
   video.dataset.playbackRequested = 'true';
-  const playPromise = video.play();
-
-  if (playPromise && typeof playPromise.catch === 'function') {
-    playPromise.catch(() => {
-      billboard.userData.videoPlaybackRequested = false;
-      if (!pendingPlayback.includes(video)) {
-        pendingPlayback.push(video);
-      }
-    });
-  }
+  requestVideoPlayback(video);
 }
 
-function pauseVideo(video, billboard) {
-  billboard.userData.videoPlaybackRequested = false;
+function pauseVideo(video) {
   delete video.dataset.playbackRequested;
 
   if (!video.paused) {
     video.pause();
+  }
+}
+
+function requestVideoPlayback(video) {
+  const playPromise = video.play();
+
+  if (playPromise && typeof playPromise.catch === 'function') {
+    playPromise.catch(() => {
+      if (
+        video.dataset.playbackRequested
+        && !pendingPlayback.includes(video)
+      ) {
+        pendingPlayback.push(video);
+      }
+    });
   }
 }
