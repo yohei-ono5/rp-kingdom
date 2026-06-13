@@ -17,6 +17,7 @@
 - `public/assets/js/scene/world-objects.js`: GLB 読み込み（モデル URL ごとにキャッシュし、並列で開始）、不透明マテリアル補正、建物配置、ナビボタン生成、MAP 用マーカー作成
 - `public/assets/js/scene/land-plots.js`: 売地/広告枠の 3D 生成（床・境界・杭・看板テクスチャ）とホバー/MAP 遷移更新
 - `public/assets/js/scene/roads.js`: `ROAD_PATHS` から曲線道路メッシュを生成し、CanvasTexture でアスファルト調の面を作成
+- `public/assets/js/scene/river.js`: `RIVER_PATHS` から川岸（MeshStandardMaterial）と水面（ShaderMaterial、3層ノイズの速度差スクロールで北→南の流れを表現）のリボンメッシュを生成。`BRIDGES` の位置に木橋（デッキ・スロープ・手すり・支柱）を配置。水面は `onBeforeRender` で `material.opacity → uniforms.opacity` を同期しイントロ形成演出と連動
 - `public/assets/js/scene/video-billboards.js`: 動画看板の 3D 生成（フレーム + 動画スクリーン + 支柱を `Group` でまとめる）、`HTMLVideoElement` + `THREE.VideoTexture` + `MeshBasicMaterial` でライト非依存の自発光表示、autoplay 失敗時のジェスチャ・フォールバック、村ビュー/MAP/タブ状態に応じた再生制御
 - `public/assets/js/scene/particle-field.js`: イントロ時に家・看板・地面へ集まる形成粒子の生成、パステル色化、形成完了後の非表示制御
 - `public/assets/js/scene/sky-objects.js`: カメラ追従の星空と月、ハロースプライト（夜間のみフェードイン）
@@ -54,7 +55,8 @@
 - 動画看板（`VIDEO_BILLBOARDS`）は Music ハウスの南側に配置、画面が南向きで `MeshBasicMaterial` + `VideoTexture` により時間帯に左右されず自発光表示。クリック / `Youtube` ナビボタン / MAPラベルで看板正面にカメラがズームして確認ポップアップから外部リンク（YouTube）へ
 - 動画看板は通常の村ビュー中のみ再生し、MAP 表示中やタブ非表示時は pause して `VideoTexture` のデコード/更新負荷を抑える
 - 売地/広告枠区画は `FOR SALE` 看板、境界線、杭で構成した 3D オブジェクトとして表示。Artist 北側にあった `A-02` は削除済み
-- 村の主要導線として `ROAD_PATHS` に沿ったアスファルト調の曲線道路を配置。道路上に木が生成されないよう、道路区間をカプセル状のツリー除外エリアとして扱う
+- 村の主要導線として `ROAD_PATHS` に沿ったアスファルト調の曲線道路を配置。道路上に木が生成されないよう、道路区間をカプセル状のツリー除外エリアとして扱う（`RIVER_PATHS` も同様に除外区間として渡す）
+- 村の東側に `RIVER_PATHS` の川が北から南へ流れる。東道路は `BRIDGES` の木橋で川を渡る。川・橋は `riverGroup` にまとめ、イントロ形成演出のリビール対象に含む
 - HOME 視点の見栄えを補うため、北側の `TREE_SCATTER` に加えて西側に `WEST_TREE_SCATTER` を追加配置
 - `TREE_SCATTER` と `WEST_TREE_SCATTER` が同じモデルURLを使う場合、`scene/trees.js` が読込Promiseを共有し、GLBの通信・解析を1回だけ実行する
 - 建物モデルは URL ごとにキャッシュしつつ並列で読み込むので、風車のような重いモデルが他の建物の表示開始をブロックしにくい
@@ -104,6 +106,7 @@
 - イントロの見た目調整は `public/index.html` の `#intro-overlay` 周辺。ロゴ画像は `public/assets/image/intro-logo.jpg`
 - イントロ形成粒子は `scene/particle-field.js` で管理。粒子数、開始高度、分散範囲、パステル変換、地面先行表示との兼ね合い、形成完了後の停止は同ファイルと `main.js` の `PARTICLE_*` 定数で調整
 - 道路の経路と幅は `public/assets/js/site-config.js` の `ROAD_PATHS`、道路メッシュとアスファルト調テクスチャは `public/assets/js/scene/roads.js` で管理
+- 川の経路・幅・川岸幅は `site-config.js` の `RIVER_PATHS`、橋の位置・向き・寸法は `BRIDGES`。水面シェーダーの流速は `scene/river.js` の GLSL 内 `speed1/2/3` 定数、昼夜の水色は `DAY_SHALLOW` / `DAY_DEEP` / `NIGHT_SHALLOW` / `NIGHT_DEEP` で調整
 - 時計の表示・配置は `public/index.html` の `#tod-widget` と `.nav-left` 周辺
 - Languageメニューの見た目は `public/index.html` の `.language-menu` 周辺、言語一覧・代表タイムゾーン・文言は `public/assets/js/i18n.js`
 - コンパスの見た目・位置は `public/index.html` の `#compass-widget` 周辺、表示制御は `public/assets/js/main.js` の `syncUiState`

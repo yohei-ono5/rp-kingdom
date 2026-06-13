@@ -183,7 +183,7 @@ function generateTreePlacements({
   return placements;
 }
 
-function isInExclusion(x, z, exclusions) {
+export function isInExclusion(x, z, exclusions) {
   return exclusions.some((zone) => {
     if (zone.type === 'circle') {
       return Math.hypot(x - zone.x, z - zone.z) < zone.radius;

@@ -1,9 +1,11 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import {
+  BRIDGES,
   FRONT_HOUSE_DESTINATION,
   HOUSE_DESTINATIONS,
   LAND_PLOTS,
+  RIVER_PATHS,
   ROAD_PATHS,
   TREE_SCATTER,
   VIDEO_BILLBOARDS,
@@ -21,6 +23,7 @@ import {
 import { loadWorldObjects, renderDestinationButtons } from './scene/world-objects.js';
 import { initLandPlots, updateLandPlotLanguage, updateLandPlots } from './scene/land-plots.js';
 import { initRoads } from './scene/roads.js';
+import { initRivers } from './scene/river.js';
 import { createTreeExclusions, initTrees } from './scene/trees.js';
 import { initVideoBillboards, updateVideoBillboardPlayback } from './scene/video-billboards.js';
 import { createSkyObjects } from './scene/sky-objects.js';
@@ -114,10 +117,12 @@ const mapOverlayGroup = new THREE.Group();
 const sceneryGroup = new THREE.Group();
 const landPlotGroup = new THREE.Group();
 const roadGroup = new THREE.Group();
+const riverGroup = new THREE.Group();
 const videoBillboardGroup = new THREE.Group();
 scene.add(villageGroup);
 scene.add(mapOverlayGroup);
 scene.add(roadGroup);
+scene.add(riverGroup);
 scene.add(sceneryGroup);
 scene.add(landPlotGroup);
 scene.add(videoBillboardGroup);
@@ -545,6 +550,11 @@ initRoads({
   paths: ROAD_PATHS,
   parentGroup: roadGroup
 });
+const riverController = initRivers({
+  rivers: RIVER_PATHS,
+  bridges: BRIDGES,
+  parentGroup: riverGroup
+});
 initLandPlots({
   plots: LAND_PLOTS,
   landPlotGroup,
@@ -565,7 +575,7 @@ refreshParticleFormationTargets();
 const treeExclusions = createTreeExclusions({
   houses: [...HOUSE_DESTINATIONS, FRONT_HOUSE_DESTINATION],
   plots: LAND_PLOTS,
-  roads: ROAD_PATHS,
+  roads: [...ROAD_PATHS, ...RIVER_PATHS],
   billboards: VIDEO_BILLBOARDS,
   padding: TREE_SCATTER.exclusionPadding
 });
@@ -1223,7 +1233,7 @@ function animate(timestamp) {
   lastFrameTime = timestamp;
   startAnimationLoop();
 
-  animationClock.getDelta();
+  const deltaSeconds = Math.min(animationClock.getDelta(), 0.25);
 
   timeOfDay.update();
 
@@ -1244,6 +1254,10 @@ function animate(timestamp) {
     timeOfDayState,
     camera,
     viewTransitionProgress: viewTransition.progress
+  });
+  riverController.update({
+    deltaSeconds,
+    timeOfDayState
   });
   particleField.update({
     elapsedTime: animationClock.elapsedTime,
@@ -1336,6 +1350,7 @@ function refreshWorldRevealMaterials() {
     { subject: villageGroup, minimumOpacity: 0 },
     { subject: mapOverlayGroup, minimumOpacity: 0 },
     { subject: roadGroup, minimumOpacity: 0 },
+    { subject: riverGroup, minimumOpacity: 0 },
     { subject: sceneryGroup, minimumOpacity: 0 },
     { subject: landPlotGroup, minimumOpacity: 0 },
     { subject: videoBillboardGroup, minimumOpacity: 0 }

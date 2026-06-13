@@ -110,6 +110,35 @@ export const ROAD_PATHS = [
       [20.0, 0, 2.2],
       [28.0, 0, 2.5]
     ]
+  },
+];
+
+export const RIVER_PATHS = [
+  {
+    id: 'east-river',
+    width: 4.6,
+    bankPadding: 2.4,
+    points: [
+      [34.0, 0, -105.0],
+      [30.5, 0, -68.0],
+      [28.5, 0, -38.0],
+      [30.8, 0, -14.0],
+      [31.5, 0, 2.5],
+      [30.5, 0, 18.0],
+      [28.0, 0, 42.0],
+      [26.0, 0, 72.0],
+      [27.5, 0, 105.0]
+    ]
+  }
+];
+
+export const BRIDGES = [
+  {
+    id: 'east-bridge',
+    position: [31.4, 0, 2.5],
+    rotationY: -0.04,
+    length: 7.2,
+    width: 3.0
   }
 ];
 
