@@ -82,7 +82,7 @@ python3 -m http.server 5500
 - `public/assets/js/systems/time-of-day.js`: `Asia/Tokyo` の取得、時間帯ライティング/太陽位置補間、時計 UI 更新
 - `public/assets/js/ui/link-popup.js`: 建物ドア／看板上に追従する確認ポップアップの生成と表示制御。単一リンクと複数リンク選択（Music の `Spotify` / `Apple Music`）に対応
 - `public/assets/models/`: 配信するGLBアセット（`Fantasy_House_6.glb`, `Fantasy_House.glb`, `windmill_2048_ktx2.glb`, `tree_LOD0.glb`）。`windmill.glb` と `windmill_2048.glb` はローカル変換用で `.gitignore` 対象
-- `public/assets/videos/`: 動画看板用 mp4 のローカル置き場（`*.mp4` は `.gitignore` で除外、本番は Cloudflare R2 から配信）
+- `public/assets/movie/`: 動画看板用 mp4 のローカル置き場（`*.mp4` は `.gitignore` で除外、本番は Cloudflare R2 から配信）
 - `resources/`: 公開対象に含めない素材置き場
 - `docs/`: 開発メモ
 

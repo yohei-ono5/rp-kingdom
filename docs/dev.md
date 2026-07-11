@@ -29,7 +29,7 @@
 - `public/assets/models/Fantasy_House.glb`: 前面のアーティストハウス（Artist）
 - `public/assets/models/windmill_2048_ktx2.glb`: SNS 用のKTX2圧縮済み風車。`windmill.glb` と `windmill_2048.glb` はローカル変換用で `.gitignore` 対象
 - `public/assets/image/intro-logo.jpg`: イントロ画面のロゴ画像
-- `public/assets/videos/`: 動画看板用 mp4 のローカル置き場（`.gitignore` で除外、本番は Cloudflare R2 から配信）
+- `public/assets/movie/`: 動画看板用 mp4 のローカル置き場（`.gitignore` で除外、本番は Cloudflare R2 から配信）
 - `resources/models/tree_LOD0.glb`: 未使用アセット
 
 ## 現状の仕様
@@ -94,7 +94,7 @@
 - `site-config.js` の `id` と `i18n.js` の `destinations.<id>` / `plots.<id>` を一致させる。例: `id: 'company'` なら `destinations.company`
 - 新しい建物モデルを追加する場合は `modelUrl` と `doorOffset` / `doorFacing` をセットで定義（フォーカスカメラとポップアップ位置に直結）
 - 新しい動画看板を追加する場合は `VIDEO_BILLBOARDS` に項目追加（`id` / `position` / `rotationY` / `width` / `height` / `videoUrl` / `url`）。同じ `id` で `i18n.js` の `destinations` に文言を追加するとナビボタンとMAPラベルに反映される
-- 動画ファイルは Cloudflare R2 にホストし、`site-config.js` の URL 定数（`YOUTUBE_PROMO_VIDEO_URL` 等）を R2 の公開 URL に差し替え。ローカル開発用に `public/assets/videos/` に同名 mp4 を置いてもよい（`.gitignore` で除外済み）
+- 動画ファイルは Cloudflare R2 にホストし、`site-config.js` の URL 定数（`YOUTUBE_PROMO_VIDEO_URL` 等）を R2 の公開 URL に差し替え。ローカル開発用に `public/assets/movie/` に同名 mp4 を置いてもよい（`.gitignore` で除外済み）
 - 風車は2048pxテクスチャをKTX2/Basis圧縮した `public/assets/models/windmill_2048_ktx2.glb` をCloudflare Pagesから直接配信する
 - KTX2テクスチャは `scene/world-objects.js` の `KTX2Loader` で読み込み、Three.js 0.158.0のBasisトランスコーダーを使用する
 - 旧R2オブジェクト `3D_object/windmill.glb` は現在参照していない。本番でKTX2版を確認し、他サイトからの参照がなければ削除可能
