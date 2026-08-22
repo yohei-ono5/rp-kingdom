@@ -30,6 +30,7 @@ import { createSkyObjects } from './scene/sky-objects.js';
 import { createParticleField } from './scene/particle-field.js';
 import { createSceneInteractionController } from './interaction/scene-interactions.js';
 import { createTimeOfDayController } from './systems/time-of-day.js';
+import { createArtDirection } from './systems/art-direction.js';
 import { createLinkPopup } from './ui/link-popup.js';
 import { createI18nController } from './i18n.js';
 
@@ -80,7 +81,7 @@ scene.background = new THREE.Color(0x1a1a2e);
 scene.fog = new THREE.Fog(0x24283d, FOG_NEAR, FOG_FAR);
 
 const camera = new THREE.PerspectiveCamera(
-  50,
+  resolveCameraFov(),
   window.innerWidth / window.innerHeight,
   0.1,
   180
@@ -98,6 +99,9 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.22;
 document.body.appendChild(renderer.domElement);
+
+const artDirection = createArtDirection({ renderer, scene });
+document.body.dataset.artStyle = artDirection.style;
 
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
@@ -586,6 +590,7 @@ const treeExclusions = createTreeExclusions({
     parentGroup: sceneryGroup,
     exclusions: treeExclusions
   }).then(() => {
+    artDirection.applyToScene();
     refreshWorldRevealMaterials();
   }).catch((error) => {
     console.error('Failed to initialize trees.', error);
@@ -605,8 +610,10 @@ void loadWorldObjects({
   updateWorldObjectTranslations();
   rebuildMapLabels();
   refreshParticleFormationTargets();
+  artDirection.applyToScene();
   refreshWorldRevealMaterials();
 });
+artDirection.applyToScene();
 refreshWorldRevealMaterials();
 interaction.bindEvents();
 bindRenderPerformanceEvents();
@@ -684,6 +691,12 @@ function getRenderPixelRatio() {
   return Math.min(window.devicePixelRatio || 1, MAX_RENDER_PIXEL_RATIO);
 }
 
+function resolveCameraFov() {
+  const params = new URLSearchParams(window.location.search);
+  const parsed = Number(params.get('fov'));
+  return Number.isFinite(parsed) && parsed >= 15 && parsed <= 80 ? parsed : 50;
+}
+
 function resolveFixedHour() {
   const params = new URLSearchParams(window.location.search);
   const hourParam = params.get('hour');
@@ -724,17 +737,69 @@ function initLights() {
 }
 
 function initGround() {
+  const geometry = new THREE.PlaneGeometry(220, 220, 96, 96);
+  applyGroundVertexColors(geometry);
+
   ground = new THREE.Mesh(
-    new THREE.PlaneGeometry(220, 220),
+    geometry,
     new THREE.MeshStandardMaterial({
       color: 0x2f6b3b,
       roughness: 0.96,
-      metalness: 0.0
+      metalness: 0.0,
+      vertexColors: true
     })
   );
   ground.rotation.x = -Math.PI / 2;
   ground.receiveShadow = true;
   scene.add(ground);
+}
+
+// 地面のベタ塗りを避けるための明度ムラ。頂点カラーは material.color に乗算されるので
+// 時刻連動の色を壊さずにディテールだけを足せる。メッシュは1枚のまま。
+function applyGroundVertexColors(geometry) {
+  const position = geometry.attributes.position;
+  const colors = new Float32Array(position.count * 3);
+  const random = createGroundRandom(20260822);
+  const patches = Array.from({ length: 26 }, () => ({
+    x: (random() - 0.5) * 200,
+    y: (random() - 0.5) * 200,
+    radius: 14 + random() * 34,
+    strength: (random() - 0.42) * 0.26
+  }));
+
+  for (let index = 0; index < position.count; index += 1) {
+    const x = position.getX(index);
+    const y = position.getY(index);
+
+    let shade = 1;
+    patches.forEach((patch) => {
+      const distance = Math.hypot(x - patch.x, y - patch.y);
+      if (distance > patch.radius) return;
+      const falloff = 1 - distance / patch.radius;
+      shade += patch.strength * falloff * falloff;
+    });
+
+    // 細かいざらつき
+    shade += (random() - 0.5) * 0.05;
+    // 外周に向かって落として奥行きを出す
+    const edge = Math.min(1, Math.hypot(x, y) / 105);
+    shade -= edge * edge * 0.34;
+
+    const value = THREE.MathUtils.clamp(shade, 0.42, 1.16);
+    colors[index * 3] = value;
+    colors[index * 3 + 1] = value * 1.02;
+    colors[index * 3 + 2] = value * 0.94;
+  }
+
+  geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+}
+
+function createGroundRandom(seed) {
+  let state = seed >>> 0;
+  return () => {
+    state = (state * 1664525 + 1013904223) >>> 0;
+    return state / 0x100000000;
+  };
 }
 
 function initMapOverlay() {
@@ -1081,21 +1146,21 @@ function updateViewTransition() {
   if (ambientLight) {
     renderAmbientColor.copy(timeOfDayState.ambientColor).lerp(mapAmbientColor, viewTransition.progress * 0.16);
     ambientLight.color.lerp(renderAmbientColor, 0.045);
-    const ambientTarget = THREE.MathUtils.lerp(
+    const ambientTarget = artDirection.scaleAmbient(THREE.MathUtils.lerp(
       timeOfDayState.ambientIntensity,
       timeOfDayState.ambientIntensity * 0.72,
       viewTransition.progress
-    );
+    ));
     ambientLight.intensity += (ambientTarget - ambientLight.intensity) * 0.045;
   }
 
   if (sunLight) {
     sunLight.color.lerp(timeOfDayState.sunColor, 0.045);
-    const sunTarget = THREE.MathUtils.lerp(
+    const sunTarget = artDirection.scaleSun(THREE.MathUtils.lerp(
       timeOfDayState.sunIntensity,
       Math.max(0.35, timeOfDayState.sunIntensity * 0.68),
       viewTransition.progress
-    );
+    ));
     sunLight.intensity += (sunTarget - sunLight.intensity) * 0.045;
     renderSunPosition.copy(timeOfDayState.sunPosition).lerp(sunPositions.map, viewTransition.progress);
     sunLight.position.lerp(renderSunPosition, 0.04);
@@ -1104,15 +1169,15 @@ function updateViewTransition() {
   if (fillLight) {
     renderFillColor.copy(timeOfDayState.fillColor).lerp(mapFillColor, viewTransition.progress * 0.22);
     fillLight.color.lerp(renderFillColor, 0.045);
-    const fillTarget = THREE.MathUtils.lerp(
+    const fillTarget = artDirection.scaleFill(THREE.MathUtils.lerp(
       timeOfDayState.fillIntensity,
       timeOfDayState.fillIntensity + 0.24,
       viewTransition.progress
-    );
+    ));
     fillLight.intensity += (fillTarget - fillLight.intensity) * 0.045;
   }
 
-  renderer.toneMappingExposure += (timeOfDayState.exposure - renderer.toneMappingExposure) * 0.035;
+  renderer.toneMappingExposure += (artDirection.scaleExposure(timeOfDayState.exposure) - renderer.toneMappingExposure) * 0.035;
 
   overlayMaterials.forEach((material) => {
     const baseOpacity = material.color?.getHex() === 0xfff3b5 ? 0.95 : 0.6;
@@ -1134,10 +1199,12 @@ function updateViewTransition() {
     house.position.y = house.userData.mapLift;
   });
 
+  const roughnessFloor = artDirection.preset.roughnessFloor;
   houseMaterials.forEach((material) => {
-    if ('roughness' in material) {
-      material.roughness = THREE.MathUtils.lerp(0.96, 0.58, viewTransition.progress);
-    }
+    if (!('roughness' in material)) return;
+    material.roughness = roughnessFloor !== null
+      ? roughnessFloor
+      : THREE.MathUtils.lerp(0.96, 0.58, viewTransition.progress);
   });
 
   const nightFactor = THREE.MathUtils.clamp(
