@@ -455,21 +455,90 @@ function link({ text, url }, modifier) {
 }
 
 // 外部サイトへ出ていくときの演出。
-// カメラが目的地へ押し込まれながら、紙の扉が左右から閉じる。
+//
+// 新規タブで開きたいが、演出を挟んでから window.open するとポップアップブロックに
+// 引っかかる(クリックのコールスタックを抜けた時点で許可が切れるため)。
+// そこでタブだけクリック直後に同期で開き、演出はその新規タブ側に持たせる。
+// 元のタブではカメラだけ寄せて戻す。
 function departTo(url, label) {
   if (departing) return;
+
+  const tab = window.open('', '_blank');
+
+  if (!tab) {
+    // ブロックされた場合だけ、紙の扉を閉じて同じタブで遷移する
+    departInPlace(url, label);
+    return;
+  }
+
+  tab.document.write(buildDepartureSplash(url, label));
+  tab.document.close();
+
+  // 元のタブは目的地へ少しだけ寄って戻る。戻ってきたときには元の景色に復帰している。
+  departure = { startedAt: performance.now(), fromPosition: currentPosition.clone(), returning: true };
+}
+
+// 新規タブに書き込む「出発中」の画面。世界観を引き継いだまま行き先へ送り出す。
+function buildDepartureSplash(url, label) {
+  const payload = JSON.stringify({ url, label });
+  return `<!DOCTYPE html>
+<html lang="ja"><head><meta charset="utf-8" />
+<title>${escapeHtml(label)}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  html, body { height: 100%; margin: 0; background: #f2e6cf; }
+  body {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 18px; color: #1b1a17;
+    font-family: 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
+    background:
+      radial-gradient(ellipse at 24% 16%, rgba(255,255,255,0.6), transparent 60%),
+      radial-gradient(ellipse at 80% 82%, rgba(196,168,118,0.26), transparent 62%),
+      #f2e6cf;
+  }
+  .rule { width: 210px; height: 1px; background: rgba(27,26,23,0.18); }
+  .kicker { font-size: 11px; letter-spacing: 0.42em; text-transform: uppercase; color: #c9a227; }
+  .name { font-size: clamp(34px, 5vw, 68px); font-weight: 500; line-height: 1.08; text-align: center; padding: 0 24px; }
+  .seam { width: 1px; height: 84px; background: linear-gradient(to bottom, transparent, #c9a227, transparent); }
+  body > * { animation: rise 620ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+  @keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+</style></head>
+<body>
+  <div class="rule"></div>
+  <div class="kicker">Departing</div>
+  <div class="name">${escapeHtml(label)}</div>
+  <div class="seam"></div>
+<script>
+  var target = ${payload};
+  setTimeout(function () {
+    // 遷移先から元のタブを触れないようにしてから送り出す
+    try { window.opener = null; } catch (error) {}
+    location.replace(target.url);
+  }, 900);
+<\/script>
+</body></html>`;
+}
+
+function escapeHtml(value) {
+  return String(value).replace(/[&<>"']/g, (character) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  })[character]);
+}
+
+// ポップアップがブロックされたときの退避路。紙の扉を閉じて同じタブで遷移する。
+function departInPlace(url, label) {
   departing = true;
 
   const overlay = document.getElementById('depart');
   overlay.classList.add('is-active');
   overlay.querySelector('.depart__name').textContent = label;
 
-  const panels = [
+  [
     [overlay.querySelector('.depart__panel--left'), '-101%'],
     [overlay.querySelector('.depart__panel--right'), '101%']
-  ];
-
-  panels.forEach(([panel, offscreen]) => {
+  ].forEach(([panel, offscreen]) => {
     panel.animate(
       [{ transform: `translateX(${offscreen})` }, { transform: 'translateX(0)' }],
       { duration: DEPART_DOOR_DURATION, easing: 'cubic-bezier(0.66, 0, 0.2, 1)', fill: 'forwards' }
@@ -477,35 +546,30 @@ function departTo(url, label) {
   });
 
   overlay.querySelector('.depart__label').animate(
-    [
-      { opacity: 0, transform: 'translateY(12px)' },
-      { opacity: 1, transform: 'translateY(0)' }
-    ],
-    {
-      duration: 320,
-      delay: DEPART_DOOR_DURATION - 90,
-      easing: 'cubic-bezier(0.16, 1, 0.3, 1)',
-      fill: 'forwards'
-    }
+    [{ opacity: 0, transform: 'translateY(12px)' }, { opacity: 1, transform: 'translateY(0)' }],
+    { duration: 320, delay: DEPART_DOOR_DURATION - 90, easing: 'cubic-bezier(0.16, 1, 0.3, 1)', fill: 'forwards' }
   );
 
-  // 扉が閉じる間、カメラを目的地へ寄せて「入っていく」感じを出す
-  departure = {
-    startedAt: performance.now(),
-    fromPosition: currentPosition.clone()
-  };
-
-  window.setTimeout(() => {
-    window.location.href = url;
-  }, DEPART_TOTAL);
+  departure = { startedAt: performance.now(), fromPosition: currentPosition.clone(), returning: false };
+  window.setTimeout(() => { window.location.href = url; }, DEPART_TOTAL);
 }
 
 function updateDeparture(now) {
-  const linear = THREE.MathUtils.clamp(
-    (now - departure.startedAt) / DEPART_DOOR_DURATION,
-    0,
-    1
-  );
-  const eased = linear * linear;
-  currentPosition.lerpVectors(departure.fromPosition, currentTarget, eased * 0.5);
+  const elapsed = now - departure.startedAt;
+
+  if (!departure.returning) {
+    const linear = THREE.MathUtils.clamp(elapsed / DEPART_DOOR_DURATION, 0, 1);
+    currentPosition.lerpVectors(departure.fromPosition, currentTarget, linear * linear * 0.5);
+    return;
+  }
+
+  // 寄ってから戻る。戻り終えたら通常のレール制御に返す。
+  const linear = THREE.MathUtils.clamp(elapsed / (DEPART_DOOR_DURATION * 2), 0, 1);
+  const push = Math.sin(linear * Math.PI);
+  currentPosition.lerpVectors(departure.fromPosition, currentTarget, push * 0.3);
+
+  if (linear >= 1) {
+    departure = null;
+    updateRailFromScroll();
+  }
 }
