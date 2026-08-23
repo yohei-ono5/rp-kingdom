@@ -39,6 +39,10 @@ body::before {
     var(--paper);
 }
 
+#world-canvas.is-pointing {
+  cursor: pointer;
+}
+
 #world-canvas {
   position: fixed;
   inset: 0;
@@ -52,6 +56,107 @@ body::before {
 
 body.is-world-ready #world-canvas {
   opacity: 1;
+}
+
+/* ---------- 入場 ---------- */
+
+/* 入場中はスクロールさせない。カメラは演出側が握る。 */
+body.is-intro {
+  overflow: hidden;
+}
+
+body.is-intro .masthead,
+body.is-intro .chapter-index,
+body.is-intro .scroll-hint,
+body.is-intro #chapters,
+body.is-intro .veil {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.masthead,
+.chapter-index,
+.scroll-hint,
+#chapters,
+.veil {
+  transition: opacity 1.2s ease 0.2s;
+}
+
+.intro {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--paper);
+  transition: opacity 1.4s ease, visibility 1.4s ease;
+}
+
+.intro.is-hidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.intro__panel {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 22px;
+}
+
+.intro__rule {
+  width: 210px;
+  height: 1px;
+  background: var(--rule);
+}
+
+.intro__kicker {
+  font-family: var(--serif);
+  font-size: 12px;
+  letter-spacing: 0.34em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.intro__title {
+  margin: 0;
+  font-family: var(--serif);
+  font-weight: 500;
+  font-size: clamp(46px, 7vw, 96px);
+  line-height: 1;
+  letter-spacing: -0.01em;
+}
+
+.intro__enter {
+  margin-top: 6px;
+  font-family: var(--serif);
+  font-size: 14px;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: var(--ink);
+  background: none;
+  border: 1px solid var(--ink);
+  border-radius: 999px;
+  padding: 13px 46px;
+  cursor: pointer;
+  transition: background 0.4s ease, color 0.4s ease, letter-spacing 0.4s ease;
+}
+
+.intro__enter:hover {
+  background: var(--ink);
+  color: var(--paper);
+  letter-spacing: 0.4em;
+}
+
+.intro__hint {
+  font-family: var(--serif);
+  font-size: 10px;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
 }
 
 /* ---------- 固定UI ---------- */

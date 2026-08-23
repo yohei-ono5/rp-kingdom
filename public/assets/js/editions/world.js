@@ -95,6 +95,10 @@ export function createWorld({ canvas }) {
   const sunLight = initLighting(scene);
   worldGroup.add(createIsland());
 
+  // 入場演出で上から降りてくるときに通り抜ける雲。スプライトなので実質無料。
+  const clouds = createClouds();
+  scene.add(clouds.group);
+
   initRoads({ paths: ROAD_PATHS, parentGroup: worldGroup });
 
   const destinations = [...HOUSE_DESTINATIONS, FRONT_HOUSE_DESTINATION];
@@ -149,6 +153,11 @@ export function createWorld({ canvas }) {
     sunLight,
     anchors,
     ready,
+    clouds,
+    setFogRange(near, far) {
+      scene.fog.near = near;
+      scene.fog.far = far;
+    },
     render() {
       renderer.render(scene, camera);
     }
@@ -356,4 +365,86 @@ function createSeededRandom(seed) {
     state = (state * 1664525 + 1013904223) >>> 0;
     return state / 0x100000000;
   };
+}
+
+// ---------- 雲 ----------
+
+const CLOUD_COUNT = 34;
+const CLOUD_MIN_Y = 46;
+const CLOUD_MAX_Y = 96;
+
+function createClouds() {
+  const group = new THREE.Group();
+  const texture = createCloudTexture();
+  const random = createSeededRandom(20260901);
+  const sprites = [];
+
+  for (let index = 0; index < CLOUD_COUNT; index += 1) {
+    const material = new THREE.SpriteMaterial({
+      map: texture,
+      transparent: true,
+      depthWrite: false,
+      opacity: 0.3 + random() * 0.3,
+      color: new THREE.Color(0xfffaf0).lerp(new THREE.Color(0xe4d6b8), random() * 0.5)
+    });
+
+    const sprite = new THREE.Sprite(material);
+    const angle = random() * Math.PI * 2;
+    const distance = 18 + Math.sqrt(random()) * 120;
+    const scale = 34 + random() * 58;
+
+    sprite.position.set(
+      Math.cos(angle) * distance,
+      THREE.MathUtils.lerp(CLOUD_MIN_Y, CLOUD_MAX_Y, random()),
+      Math.sin(angle) * distance
+    );
+    sprite.scale.set(scale, scale * (0.42 + random() * 0.2), 1);
+
+    sprite.userData.driftSpeed = (0.35 + random() * 0.7) * (random() > 0.5 ? 1 : -1);
+    sprite.userData.baseOpacity = material.opacity;
+
+    group.add(sprite);
+    sprites.push(sprite);
+  }
+
+  return {
+    group,
+    // 雲は常にゆっくり流れる。JS側の更新はこれだけに留める。
+    update(deltaSeconds) {
+      sprites.forEach((sprite) => {
+        sprite.position.x += sprite.userData.driftSpeed * deltaSeconds;
+        if (sprite.position.x > 150) sprite.position.x = -150;
+        if (sprite.position.x < -150) sprite.position.x = 150;
+      });
+    },
+    // 島に降り立ったあとは雲を薄くして、村の視界を邪魔しないようにする
+    setVisibility(amount) {
+      sprites.forEach((sprite) => {
+        sprite.material.opacity = sprite.userData.baseOpacity * amount;
+      });
+      group.visible = amount > 0.01;
+    }
+  };
+}
+
+function createCloudTexture() {
+  const size = 256;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const context = canvas.getContext('2d');
+
+  const gradient = context.createRadialGradient(
+    size / 2, size / 2, 0,
+    size / 2, size / 2, size / 2
+  );
+  gradient.addColorStop(0, 'rgba(255,255,255,1)');
+  gradient.addColorStop(0.42, 'rgba(255,255,255,0.72)');
+  gradient.addColorStop(1, 'rgba(255,255,255,0)');
+  context.fillStyle = gradient;
+  context.fillRect(0, 0, size, size);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
 }
