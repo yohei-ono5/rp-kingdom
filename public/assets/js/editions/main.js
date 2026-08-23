@@ -4,7 +4,7 @@ import { createWorld } from './world.js';
 
 const ARC_HEIGHT = 6.5;
 const CAMERA_DAMPING = 0.075;
-const INTRO_DURATION = 5200;
+const INTRO_DURATION = 4000;
 const INTRO_START_POSITION = new THREE.Vector3(6, 142, 226);
 const INTRO_START_TARGET = new THREE.Vector3(0, 34, 0);
 const CLOUD_RESIDUAL_OPACITY = 0.22;
@@ -12,6 +12,12 @@ const CLOUD_RESIDUAL_OPACITY = 0.22;
 // こうしないと開始位置(遠い)では島が霧に溶けて何も見えない。
 const FOG_INTRO = { near: 230, far: 560 };
 const FOG_SETTLED = { near: 95, far: 235 };
+const JUMP_DURATION = 1250;
+// 軽いオービット。構図が壊れない範囲だけ振れるように上限を決める。
+const ORBIT_MAX_YAW = THREE.MathUtils.degToRad(20);
+const ORBIT_MAX_PITCH = THREE.MathUtils.degToRad(11);
+const ORBIT_SENSITIVITY = 0.0032;
+const ORBIT_RECENTER = 0.012;
 
 const canvas = document.getElementById('world-canvas');
 const world = createWorld({ canvas });
@@ -34,6 +40,10 @@ const currentTarget = keyframes[0].target.clone();
 
 let activeChapter = 0;
 let introState = 'waiting';
+let jump = null;
+const orbit = { yaw: 0, pitch: 0, dragging: false, lastX: 0, lastY: 0, moved: 0 };
+const orbitOffset = new THREE.Vector3();
+const orbitSpherical = new THREE.Spherical();
 let introStartedAt = 0;
 let lastFrameAt = performance.now();
 
@@ -47,12 +57,19 @@ currentTarget.copy(introTargetFrom);
 world.camera.position.copy(currentPosition);
 world.camera.lookAt(currentTarget);
 
-world.ready.then(() => {
-  document.body.classList.add('is-world-ready');
-});
-
 const introOverlay = document.getElementById('intro');
 const introEnter = document.getElementById('intro-enter');
+
+// 世界が揃うまで ENTER は押せない。押せてしまうと空の島に降りてしまう。
+let worldReady = false;
+if (introEnter) introEnter.disabled = true;
+
+world.ready.then(() => {
+  worldReady = true;
+  document.body.classList.add('is-world-ready');
+  document.body.classList.add('is-loaded');
+  if (introEnter) introEnter.disabled = false;
+});
 
 introEnter?.addEventListener('click', startIntro);
 window.addEventListener('keydown', (event) => {
@@ -62,10 +79,12 @@ window.addEventListener('keydown', (event) => {
 window.addEventListener('scroll', updateRailFromScroll, { passive: true });
 window.addEventListener('resize', updateRailFromScroll, { passive: true });
 bindWorldPicking();
+bindOrbit();
+bindMastheadLink();
 updateRailFromScroll();
 
 function startIntro() {
-  if (introState !== 'waiting') return;
+  if (introState !== 'waiting' || !worldReady) return;
   introState = 'flying';
   introStartedAt = performance.now();
   introOverlay?.classList.add('is-hidden');
@@ -84,9 +103,16 @@ requestAnimationFrame(function frame() {
 
   if (introState === 'flying') {
     updateIntroFlight(now);
+  } else if (jump) {
+    updateJump(now);
   } else if (introState === 'done') {
     currentPosition.lerp(desiredPosition, CAMERA_DAMPING);
     currentTarget.lerp(desiredTarget, CAMERA_DAMPING);
+  }
+
+  if (!orbit.dragging) {
+    orbit.yaw += (0 - orbit.yaw) * ORBIT_RECENTER;
+    orbit.pitch += (0 - orbit.pitch) * ORBIT_RECENTER;
   }
 
   // 完全な静止を作らない。ごく僅かな呼吸で世界が生きて見える。
@@ -99,6 +125,11 @@ requestAnimationFrame(function frame() {
     currentPosition.y + breathY,
     currentPosition.z
   );
+
+  if (introState === 'done') {
+    applyOrbit(world.camera.position, currentTarget);
+  }
+
   world.camera.lookAt(currentTarget);
 
   world.render();
@@ -183,15 +214,105 @@ function bindWorldPicking() {
     const id = pickAt(event);
     if (!id) return;
 
-    const index = CHAPTERS.findIndex((chapter) => chapter.id === id);
+    const index = CHAPTERS.findIndex(
+      (chapter) => (chapter.anchorId || chapter.id) === id
+    );
     if (index < 0) return;
 
-    const scrollable = document.documentElement.scrollHeight - window.innerHeight;
-    window.scrollTo({
-      top: (index / (keyframes.length - 1)) * scrollable,
-      behavior: 'smooth'
-    });
+    navigateToChapter(index);
   }, { passive: true });
+}
+
+// レール上を辿ると間の章のカメラ位置を全部経由してしまい、行ったり来たりに見える。
+// 直接クリックしたときは現在地から目的地へ直行させる。
+function navigateToChapter(index) {
+  const scrollable = document.documentElement.scrollHeight - window.innerHeight;
+  const top = (index / (keyframes.length - 1)) * scrollable;
+
+  // スクロール位置は即座に合わせ、見た目のカメラ移動はこちらで持つ
+  window.scrollTo({ top, behavior: 'instant' });
+
+  jump = {
+    startedAt: performance.now(),
+    fromPosition: currentPosition.clone(),
+    fromTarget: currentTarget.clone(),
+    toPosition: keyframes[index].position.clone(),
+    toTarget: keyframes[index].target.clone()
+  };
+
+  activeChapter = index;
+  syncActiveChapter();
+}
+
+function updateJump(now) {
+  const linear = THREE.MathUtils.clamp((now - jump.startedAt) / JUMP_DURATION, 0, 1);
+  const eased = 1 - Math.pow(1 - linear, 3);
+
+  currentPosition.lerpVectors(jump.fromPosition, jump.toPosition, eased);
+  currentTarget.lerpVectors(jump.fromTarget, jump.toTarget, eased);
+  // 建物をすり抜けないように途中だけ持ち上げる
+  currentPosition.y += Math.sin(eased * Math.PI) * ARC_HEIGHT;
+
+  if (linear >= 1) {
+    jump = null;
+    desiredPosition.copy(currentPosition);
+    desiredTarget.copy(currentTarget);
+    updateRailFromScroll();
+  }
+}
+
+// ドラッグで少しだけ見回せるようにする。離すとゆっくり正面へ戻る。
+function bindOrbit() {
+  const canvas = world.renderer.domElement;
+
+  window.addEventListener('pointerdown', (event) => {
+    if (introState !== 'done') return;
+    if (event.target.closest('.chapter__panel, .masthead, .chapter-index')) return;
+    orbit.dragging = true;
+    orbit.moved = 0;
+    orbit.lastX = event.clientX;
+    orbit.lastY = event.clientY;
+  }, { passive: true });
+
+  window.addEventListener('pointermove', (event) => {
+    if (!orbit.dragging) return;
+    const deltaX = event.clientX - orbit.lastX;
+    const deltaY = event.clientY - orbit.lastY;
+    orbit.lastX = event.clientX;
+    orbit.lastY = event.clientY;
+    orbit.moved += Math.hypot(deltaX, deltaY);
+
+    orbit.yaw = THREE.MathUtils.clamp(
+      orbit.yaw - deltaX * ORBIT_SENSITIVITY,
+      -ORBIT_MAX_YAW,
+      ORBIT_MAX_YAW
+    );
+    orbit.pitch = THREE.MathUtils.clamp(
+      orbit.pitch + deltaY * ORBIT_SENSITIVITY,
+      -ORBIT_MAX_PITCH,
+      ORBIT_MAX_PITCH
+    );
+    canvas.classList.add('is-grabbing');
+  }, { passive: true });
+
+  window.addEventListener('pointerup', () => {
+    orbit.dragging = false;
+    canvas.classList.remove('is-grabbing');
+  }, { passive: true });
+}
+
+// カメラをターゲット周りに少しだけ回す
+function applyOrbit(position, target) {
+  orbitOffset.copy(position).sub(target);
+  orbitSpherical.setFromVector3(orbitOffset);
+  orbitSpherical.theta += orbit.yaw;
+  orbitSpherical.phi = THREE.MathUtils.clamp(
+    orbitSpherical.phi + orbit.pitch,
+    0.12,
+    Math.PI * 0.495
+  );
+  orbitOffset.setFromSpherical(orbitSpherical);
+  position.copy(target).add(orbitOffset);
 }
 
 function updateRailFromScroll() {
@@ -220,7 +341,17 @@ function updateRailFromScroll() {
   }
 }
 
+let videoActive = false;
+
 function syncActiveChapter() {
+  // Film 章の前後にいるときだけ動画を読み込んで再生する
+  const filmIndex = CHAPTERS.findIndex((chapter) => chapter.id === 'film');
+  const shouldPlay = Math.abs(activeChapter - filmIndex) <= 1;
+  if (shouldPlay !== videoActive) {
+    videoActive = shouldPlay;
+    world.setVideoActive(shouldPlay);
+  }
+
   indexRoot.querySelectorAll('.chapter-index__item').forEach((item, index) => {
     item.classList.toggle('is-active', index === activeChapter);
   });
@@ -260,12 +391,24 @@ function buildChapterSections() {
   }));
 }
 
+function bindMastheadLink() {
+  const cta = document.querySelector('.masthead__cta');
+  cta?.addEventListener('click', (event) => {
+    event.preventDefault();
+    navigateToChapter(CHAPTERS.length - 1);
+  });
+}
+
 function buildChapterIndex() {
   indexRoot.replaceChildren(...CHAPTERS.map((chapter, index) => {
     const item = document.createElement('a');
     item.className = 'chapter-index__item';
     if (index === 0) item.classList.add('is-active');
     item.href = `#chapter-${chapter.id}`;
+    item.addEventListener('click', (event) => {
+      event.preventDefault();
+      navigateToChapter(index);
+    });
     item.append(
       element('span', 'chapter-index__label', chapter.label),
       element('span', 'chapter-index__numeral', chapter.numeral)

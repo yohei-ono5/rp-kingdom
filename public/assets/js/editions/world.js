@@ -8,6 +8,7 @@ import {
 import { initRoads } from '../scene/roads.js';
 import { createTreeExclusions, initTrees } from '../scene/trees.js';
 import { loadWorldObjects } from '../scene/world-objects.js';
+import { initVideoBillboards, updateVideoBillboardPlayback } from '../scene/video-billboards.js';
 import { createArtDirection } from '../systems/art-direction.js';
 
 // Editions 版のワールド。
@@ -101,10 +102,18 @@ export function createWorld({ canvas }) {
 
   initRoads({ paths: ROAD_PATHS, parentGroup: worldGroup });
 
+  // 動画看板を復活。src は再生要求が来るまで設定されないので初期ロードは重くならない。
+  const videoBillboards = initVideoBillboards({
+    billboards: VIDEO_BILLBOARDS,
+    parentGroup: worldGroup,
+    clickTargets: []
+  });
+
   const destinations = [...HOUSE_DESTINATIONS, FRONT_HOUSE_DESTINATION];
   const anchors = new Map();
+  const anchorsSeed = [];
 
-  const ready = loadWorldObjects({
+  const worldObjectsReady = loadWorldObjects({
     objects: destinations,
     renderer,
     villageGroup: worldGroup,
@@ -116,6 +125,9 @@ export function createWorld({ canvas }) {
   }).then(() => {
     worldGroup.children.forEach((child) => {
       if (child.userData?.id) anchors.set(child.userData.id, child);
+    });
+    videoBillboards.forEach((billboard) => {
+      if (billboard.userData?.id) anchors.set(billboard.userData.id, billboard);
     });
     artDirection.applyToScene();
     renderer.shadowMap.needsUpdate = true;
@@ -129,14 +141,17 @@ export function createWorld({ canvas }) {
     padding: TREE_SCATTER_EDITIONS.exclusionPadding
   });
 
-  [TREE_SCATTER_EDITIONS, WEST_TREE_SCATTER_EDITIONS].forEach((treeConfig) => {
-    void initTrees({ treeConfig, parentGroup: worldGroup, exclusions })
+  const treesReady = [TREE_SCATTER_EDITIONS, WEST_TREE_SCATTER_EDITIONS].map((treeConfig) =>
+    initTrees({ treeConfig, parentGroup: worldGroup, exclusions })
       .then(() => {
         artDirection.applyToScene();
         renderer.shadowMap.needsUpdate = true;
       })
-      .catch((error) => console.error('Failed to scatter trees.', error));
-  });
+      .catch((error) => console.error('Failed to scatter trees.', error))
+  );
+
+  // ENTER を押せるようになる条件。建物と木が揃うまで待つ。
+  const ready = Promise.all([worldObjectsReady, ...treesReady]);
 
   artDirection.applyToScene();
 
@@ -154,6 +169,15 @@ export function createWorld({ canvas }) {
     anchors,
     ready,
     clouds,
+    // 動画は再生要求が出て初めて src が設定される。Film 章に近づいたときだけ呼ぶ。
+    setVideoActive(active) {
+      updateVideoBillboardPlayback({
+        billboards: videoBillboards,
+        pageVisible: true,
+        currentView: active ? 'village' : 'map',
+        playbackReady: active
+      });
+    },
     setFogRange(near, far) {
       scene.fog.near = near;
       scene.fog.far = far;

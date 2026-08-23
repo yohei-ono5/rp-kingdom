@@ -43,6 +43,10 @@ body::before {
   cursor: pointer;
 }
 
+#world-canvas.is-grabbing {
+  cursor: grabbing;
+}
+
 #world-canvas {
   position: fixed;
   inset: 0;
@@ -145,10 +149,25 @@ body.is-intro .veil {
   transition: background 0.4s ease, color 0.4s ease, letter-spacing 0.4s ease;
 }
 
-.intro__enter:hover {
+.intro__enter[disabled] {
+  opacity: 0.35;
+  cursor: progress;
+  pointer-events: none;
+}
+
+.intro__enter:not([disabled]):hover {
   background: var(--ink);
   color: var(--paper);
   letter-spacing: 0.4em;
+}
+
+/* 読み込み中は ENTER の代わりに状態を出す */
+.intro__hint::after {
+  content: 'Loading the kingdom';
+}
+
+body.is-loaded .intro__hint::after {
+  content: 'Press Enter';
 }
 
 .intro__hint {

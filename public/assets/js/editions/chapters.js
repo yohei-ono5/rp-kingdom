@@ -59,6 +59,8 @@ export const CHAPTERS = [
   },
   {
     id: 'film',
+    // 世界の中でこの章に対応するオブジェクト(看板)のID
+    anchorId: 'youtube',
     numeral: 'VI',
     label: 'Film',
     kicker: 'The Screen',
