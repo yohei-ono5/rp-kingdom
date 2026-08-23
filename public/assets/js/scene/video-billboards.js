@@ -53,13 +53,32 @@ function createBillboard(data) {
   texture.minFilter = THREE.LinearFilter;
   texture.magFilter = THREE.LinearFilter;
 
+  // 動画は再生要求が出るまで読み込まないので、それまでは静止画を出しておく。
+  // 何もないと画面が真っ黒になってしまう。
+  const posterTexture = data.posterUrl ? createPosterTexture(data.posterUrl) : null;
+
+  const screenMaterial = new THREE.MeshBasicMaterial({
+    map: posterTexture || texture,
+    color: 0xffffff,
+    toneMapped: false
+  });
+
+  if (posterTexture) {
+    // 実際に絵が出るようになってから動画テクスチャへ差し替える
+    const showVideo = () => {
+      if (video.readyState < 2) return;
+      screenMaterial.map = texture;
+      screenMaterial.needsUpdate = true;
+      video.removeEventListener('loadeddata', showVideo);
+      video.removeEventListener('playing', showVideo);
+    };
+    video.addEventListener('loadeddata', showVideo);
+    video.addEventListener('playing', showVideo);
+  }
+
   const screen = new THREE.Mesh(
     new THREE.PlaneGeometry(width, height),
-    new THREE.MeshBasicMaterial({
-      map: texture,
-      color: 0xffffff,
-      toneMapped: false
-    })
+    screenMaterial
   );
   screen.position.z = FRAME_DEPTH / 2 + SCREEN_FORWARD_OFFSET;
   wrapper.add(screen);
@@ -78,11 +97,21 @@ function createBillboard(data) {
     video,
     videoUrl: data.videoUrl,
     texture,
+    posterTexture,
+    screenMaterial,
     shouldPlayVideo: false,
     videoSourceLoaded: false
   };
 
   return wrapper;
+}
+
+function createPosterTexture(posterUrl) {
+  const texture = new THREE.TextureLoader().load(posterUrl);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.minFilter = THREE.LinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  return texture;
 }
 
 function createVideoElement(videoUrl) {

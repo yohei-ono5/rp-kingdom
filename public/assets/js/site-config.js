@@ -3,6 +3,7 @@ const ARTIST_HOUSE_MODEL_URL = new URL('../models/Fantasy_House.glb', import.met
 const TREE_MODEL_URL = new URL('../models/tree_LOD0.glb', import.meta.url).href;
 const WINDMILL_MODEL_URL = new URL('../models/windmill_2048_ktx2.glb', import.meta.url).href;
 const YOUTUBE_PROMO_VIDEO_URL = 'https://pub-8c47d9817fce4e86a82d02fad188f8e8.r2.dev/youtube-promo_720p.mp4';
+const YOUTUBE_PROMO_POSTER_URL = new URL('../image/youtube-promo-poster.jpg', import.meta.url).href;
 
 export const HOUSE_DESTINATIONS = [
   {
@@ -75,6 +76,7 @@ export const VIDEO_BILLBOARDS = [
     id: 'youtube',
     url: 'https://www.youtube.com/@Rujie-official',
     videoUrl: YOUTUBE_PROMO_VIDEO_URL,
+    posterUrl: YOUTUBE_PROMO_POSTER_URL,
     position: [-12.0, 3.0, 18.0],
     rotationY: 0,
     width: 4.0,
