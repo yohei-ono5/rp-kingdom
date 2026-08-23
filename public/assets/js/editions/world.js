@@ -18,6 +18,9 @@ import { createArtDirection } from '../systems/art-direction.js';
 const PAPER = 0xf2e6cf;
 const ISLAND_RADIUS = 44;
 const ISLAND_DEPTH = 19;
+// 上面の縁がどれだけ落ちるか。側面の上端もここに合わせないと輪状の隙間が開く。
+const ISLAND_EDGE_DROP = 1.2;
+const ISLAND_EDGE_START = 0.93;
 
 const TREE_SCATTER_EDITIONS = Object.freeze({
   modelUrl: new URL('../../models/tree_LOD0.glb', import.meta.url).href,
@@ -25,8 +28,8 @@ const TREE_SCATTER_EDITIONS = Object.freeze({
   seed: 20260822,
   bounds: { minX: -27, maxX: 25, minZ: -27, maxZ: -5 },
   centerClearRadius: 13,
-  scaleRange: [0.2, 0.34],
-  minDistance: 1.5,
+  scaleRange: [0.3, 0.5],
+  minDistance: 2.1,
   exclusionPadding: 1.7
 });
 
@@ -36,7 +39,7 @@ const WEST_TREE_SCATTER_EDITIONS = Object.freeze({
   seed: 20260823,
   bounds: { minX: -28, maxX: -16, minZ: -5, maxZ: 22 },
   centerClearRadius: 0,
-  scaleRange: [0.22, 0.4]
+  scaleRange: [0.32, 0.56]
 });
 
 export function createWorld({ canvas }) {
@@ -100,7 +103,10 @@ export function createWorld({ canvas }) {
   const clouds = createClouds();
   scene.add(clouds.group);
 
-  initRoads({ paths: ROAD_PATHS, parentGroup: worldGroup });
+  initRoads({
+    paths: extendRoadsToIslandEdge(ROAD_PATHS),
+    parentGroup: worldGroup
+  });
 
   // 動画看板を復活。src は再生要求が来るまで設定されないので初期ロードは重くならない。
   const videoBillboards = initVideoBillboards({
@@ -188,6 +194,49 @@ export function createWorld({ canvas }) {
   };
 }
 
+// 元の道は島の中ほどで途切れてしまうので、両端を接線方向に延ばして縁まで通す。
+// 縁の手前(上面が下がり始める半径)で止めるため、道が浮くことはない。
+const ROAD_EDGE_RADIUS = ISLAND_RADIUS * 0.91;
+
+function extendRoadsToIslandEdge(paths) {
+  return paths.map((path) => {
+    const points = path.points.map((point) => [...point]);
+    if (points.length < 2) return path;
+
+    const head = extendPastEdge(points[1], points[0]);
+    const tail = extendPastEdge(points[points.length - 2], points[points.length - 1]);
+
+    return {
+      ...path,
+      points: [
+        ...(head ? [head] : []),
+        ...points,
+        ...(tail ? [tail] : [])
+      ]
+    };
+  });
+}
+
+// inner から outer への向きに進み、島の縁の半径に達する点を返す
+function extendPastEdge(inner, outer) {
+  const dirX = outer[0] - inner[0];
+  const dirZ = outer[2] - inner[2];
+  const length = Math.hypot(dirX, dirZ);
+  if (length < 0.0001) return null;
+
+  const nx = dirX / length;
+  const nz = dirZ / length;
+  const dot = outer[0] * nx + outer[2] * nz;
+  const distanceSquared = outer[0] * outer[0] + outer[2] * outer[2];
+  const discriminant = dot * dot - distanceSquared + ROAD_EDGE_RADIUS * ROAD_EDGE_RADIUS;
+  if (discriminant <= 0) return null;
+
+  const step = -dot + Math.sqrt(discriminant);
+  if (step <= 0.2) return null;
+
+  return [outer[0] + nx * step, 0, outer[2] + nz * step];
+}
+
 function initLighting(scene) {
   // 環境光は絞り、太陽1灯で形を作る。影が伸びるマジックアワーの角度で固定。
   scene.add(new THREE.AmbientLight(0xfff0d8, 0.34));
@@ -258,9 +307,9 @@ function createIslandTop() {
       const x = Math.cos(angle) * radius;
       const z = Math.sin(angle) * radius;
 
-      // 縁だけ落として丸みをつける。中央は完全に平坦(建物が浮かないように)。
-      const edge = THREE.MathUtils.smoothstep(radiusRatio, 0.84, 1);
-      positions.push(x, -edge * 1.8, z);
+      // 縁だけ落として丸みをつける。中央は完全に平坦(建物や道が浮かないように)。
+      const edge = THREE.MathUtils.smoothstep(radiusRatio, ISLAND_EDGE_START, 1);
+      positions.push(x, -edge * ISLAND_EDGE_DROP, z);
 
       let shade = 1;
       patches.forEach((patch) => {
@@ -309,65 +358,76 @@ function createIslandTop() {
 }
 
 function createIslandSide() {
-  const geometry = new THREE.CylinderGeometry(
-    ISLAND_RADIUS,
-    ISLAND_RADIUS * 0.46,
-    ISLAND_DEPTH,
-    88,
-    10,
-    true
-  );
-
+  const rings = 30;
+  const segments = 96;
   const random = createSeededRandom(20260825);
-  const position = geometry.attributes.position;
-  const colors = new Float32Array(position.count * 3);
+
+  const positions = [];
+  const colors = [];
+  const indices = [];
 
   const rock = new THREE.Color(0x8c7d68);
   const deep = new THREE.Color(0x453c37);
   const temp = new THREE.Color();
-  const vertex = new THREE.Vector3();
 
+  // 岩の張り出し。上端と下端では必ず 0 になるので、上面から食み出したり
+  // 縁に段差が出たりしない。
   const ridges = Array.from({ length: 13 }, () => ({
     angle: random() * Math.PI * 2,
-    width: 0.22 + random() * 0.5,
-    amount: 0.02 + random() * 0.07
+    width: 0.24 + random() * 0.52,
+    amount: 0.04 + random() * 0.1
   }));
 
-  for (let index = 0; index < position.count; index += 1) {
-    vertex.fromBufferAttribute(position, index);
+  for (let ring = 0; ring <= rings; ring += 1) {
+    // t = 0 が最下端の先、t = 1 が上面の縁
+    const t = ring / rings;
+    // 縁は断崖(ほぼ垂直)から始めて、下へ向かうほど内側へ丸め込む。
+    // 縁が斜めだと太陽を正面から受けて白く飛び、裂け目のように見えてしまう。
+    const profile = 1 - Math.pow(1 - t, 2.4);
+    // t=1 のとき上面の縁とちょうど同じ高さになるようにする
+    const y = -ISLAND_EDGE_DROP - (ISLAND_DEPTH - ISLAND_EDGE_DROP) * (1 - t);
+    const bulgeScale = 4 * t * (1 - t);
 
-    const heightRatio = THREE.MathUtils.clamp(
-      (vertex.y + ISLAND_DEPTH / 2) / ISLAND_DEPTH,
-      0,
-      1
-    );
-    const angle = Math.atan2(vertex.z, vertex.x);
+    for (let segment = 0; segment <= segments; segment += 1) {
+      const angle = (segment / segments) * Math.PI * 2;
 
-    let bulge = 0;
-    ridges.forEach((ridge) => {
-      let delta = Math.abs(angle - ridge.angle);
-      if (delta > Math.PI) delta = Math.PI * 2 - delta;
-      if (delta > ridge.width) return;
-      const falloff = 1 - delta / ridge.width;
-      bulge += ridge.amount * falloff * falloff * (1 - heightRatio);
-    });
+      let bulge = 0;
+      ridges.forEach((ridge) => {
+        let delta = Math.abs(angle - ridge.angle);
+        if (delta > Math.PI) delta = Math.PI * 2 - delta;
+        if (delta > ridge.width) return;
+        const falloff = 1 - delta / ridge.width;
+        bulge += ridge.amount * falloff * falloff;
+      });
 
-    // 張り出しは必ず上面の半径以内に収める。加算で膨らむと上面から食み出して
-    // 巨大な影のような塊に見えてしまう。
-    const scale = 1 + Math.min(bulge, 0.1);
-    const radius = Math.hypot(vertex.x, vertex.z) * scale;
-    const limit = Math.min(radius, ISLAND_RADIUS * 0.995);
-    const ratio = radius > 0.0001 ? limit / Math.hypot(vertex.x, vertex.z) : 1;
-    position.setXYZ(index, vertex.x * ratio, vertex.y, vertex.z * ratio);
+      // 外向きに膨らませると草地の半径を超えて庇のように突き出し、
+      // そこが陽を受けて白い裂け目に見える。凹凸は必ず内向きにする。
+      const inset = Math.min(bulge, 0.22) * bulgeScale;
+      const radius = ISLAND_RADIUS * profile * (1 - inset);
+      positions.push(Math.cos(angle) * radius, y, Math.sin(angle) * radius);
 
-    const rockMix = THREE.MathUtils.smoothstep(heightRatio, 0.02, 0.95);
-    temp.copy(deep).lerp(rock, rockMix).multiplyScalar(0.85 + random() * 0.26);
-    colors[index * 3] = temp.r;
-    colors[index * 3 + 1] = temp.g;
-    colors[index * 3 + 2] = temp.b;
+      const rockMix = THREE.MathUtils.smoothstep(t, 0.02, 0.92);
+      // 草の庇の下は陰になる。ここを暗く落とすと上面との境目が締まる。
+      const overhang = 1 - THREE.MathUtils.smoothstep(t, 0.86, 1) * 0.42;
+      temp.copy(deep).lerp(rock, rockMix)
+        .multiplyScalar((0.86 + random() * 0.22) * overhang);
+      colors.push(temp.r, temp.g, temp.b);
+    }
   }
 
-  geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  const stride = segments + 1;
+  for (let ring = 0; ring < rings; ring += 1) {
+    for (let segment = 0; segment < segments; segment += 1) {
+      const a = ring * stride + segment;
+      const b = a + stride;
+      indices.push(a, b, a + 1, a + 1, b, b + 1);
+    }
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  geometry.setIndex(indices);
   geometry.computeVertexNormals();
 
   const side = new THREE.Mesh(
@@ -375,11 +435,9 @@ function createIslandSide() {
     new THREE.MeshStandardMaterial({
       vertexColors: true,
       roughness: 1,
-      metalness: 0,
-      flatShading: true
+      metalness: 0
     })
   );
-  side.position.y = -ISLAND_DEPTH / 2;
   return side;
 }
 
