@@ -12,7 +12,10 @@ const CLOUD_RESIDUAL_OPACITY = 0.22;
 // こうしないと開始位置(遠い)では島が霧に溶けて何も見えない。
 const FOG_INTRO = { near: 230, far: 560 };
 const FOG_SETTLED = { near: 95, far: 235 };
-const JUMP_DURATION = 1250;
+// 紙が横切る一連の動き。覆っている間にカメラを瞬間移動させるので、
+// 飛行時間を待たせずに切り替わる。
+const WIPE_DURATION = 1180;
+const WIPE_COVER_AT = 0.4;
 // 軽いオービット。構図が壊れない範囲だけ振れるように上限を決める。
 const ORBIT_MAX_YAW = THREE.MathUtils.degToRad(20);
 const ORBIT_MAX_PITCH = THREE.MathUtils.degToRad(11);
@@ -40,7 +43,7 @@ const currentTarget = keyframes[0].target.clone();
 
 let activeChapter = 0;
 let introState = 'waiting';
-let jump = null;
+let wiping = false;
 const orbit = { yaw: 0, pitch: 0, dragging: false, lastX: 0, lastY: 0, moved: 0 };
 const orbitOffset = new THREE.Vector3();
 const orbitSpherical = new THREE.Spherical();
@@ -103,8 +106,6 @@ requestAnimationFrame(function frame() {
 
   if (introState === 'flying') {
     updateIntroFlight(now);
-  } else if (jump) {
-    updateJump(now);
   } else if (introState === 'done') {
     currentPosition.lerp(desiredPosition, CAMERA_DAMPING);
     currentTarget.lerp(desiredTarget, CAMERA_DAMPING);
@@ -224,41 +225,58 @@ function bindWorldPicking() {
 }
 
 // レール上を辿ると間の章のカメラ位置を全部経由してしまい、行ったり来たりに見える。
-// 直接クリックしたときは現在地から目的地へ直行させる。
+// 紙で画面を覆っている隙にカメラを移してしまうことで、経由も待ち時間もなくす。
 function navigateToChapter(index) {
-  const scrollable = document.documentElement.scrollHeight - window.innerHeight;
-  const top = (index / (keyframes.length - 1)) * scrollable;
+  if (wiping) return;
+  wiping = true;
 
-  // スクロール位置は即座に合わせ、見た目のカメラ移動はこちらで持つ
-  window.scrollTo({ top, behavior: 'instant' });
+  const chapter = CHAPTERS[index];
+  const wipe = document.getElementById('wipe');
+  const sheet = wipe.querySelector('.wipe__sheet');
+  const label = wipe.querySelector('.wipe__label');
 
-  jump = {
-    startedAt: performance.now(),
-    fromPosition: currentPosition.clone(),
-    fromTarget: currentTarget.clone(),
-    toPosition: keyframes[index].position.clone(),
-    toTarget: keyframes[index].target.clone()
-  };
+  wipe.querySelector('.wipe__numeral').textContent = `${chapter.numeral} — ${chapter.kicker}`;
+  wipe.querySelector('.wipe__name').textContent = chapter.label;
 
-  activeChapter = index;
-  syncActiveChapter();
-}
+  sheet.animate([
+    { transform: 'translateX(-105%)', easing: 'cubic-bezier(0.65, 0, 0.35, 1)' },
+    { transform: 'translateX(0)', offset: WIPE_COVER_AT, easing: 'linear' },
+    { transform: 'translateX(0)', offset: 0.6, easing: 'cubic-bezier(0.65, 0, 0.35, 1)' },
+    { transform: 'translateX(105%)' }
+  ], { duration: WIPE_DURATION, fill: 'forwards' });
 
-function updateJump(now) {
-  const linear = THREE.MathUtils.clamp((now - jump.startedAt) / JUMP_DURATION, 0, 1);
-  const eased = 1 - Math.pow(1 - linear, 3);
+  label.animate([
+    { opacity: 0, transform: 'translateY(14px)', offset: 0 },
+    { opacity: 0, transform: 'translateY(14px)', offset: WIPE_COVER_AT * 0.72 },
+    { opacity: 1, transform: 'translateY(0)', offset: WIPE_COVER_AT + 0.04, easing: 'cubic-bezier(0.16, 1, 0.3, 1)' },
+    { opacity: 1, transform: 'translateY(0)', offset: 0.58 },
+    { opacity: 0, transform: 'translateY(-10px)', offset: 0.74 },
+    { opacity: 0, offset: 1 }
+  ], { duration: WIPE_DURATION, fill: 'forwards' });
 
-  currentPosition.lerpVectors(jump.fromPosition, jump.toPosition, eased);
-  currentTarget.lerpVectors(jump.fromTarget, jump.toTarget, eased);
-  // 建物をすり抜けないように途中だけ持ち上げる
-  currentPosition.y += Math.sin(eased * Math.PI) * ARC_HEIGHT;
+  // 紙が覆いきった瞬間に世界を差し替える
+  window.setTimeout(() => {
+    const scrollable = document.documentElement.scrollHeight - window.innerHeight;
+    window.scrollTo({
+      top: (index / (keyframes.length - 1)) * scrollable,
+      behavior: 'instant'
+    });
 
-  if (linear >= 1) {
-    jump = null;
-    desiredPosition.copy(currentPosition);
-    desiredTarget.copy(currentTarget);
-    updateRailFromScroll();
-  }
+    orbit.yaw = 0;
+    orbit.pitch = 0;
+
+    desiredPosition.copy(keyframes[index].position);
+    desiredTarget.copy(keyframes[index].target);
+    currentPosition.copy(desiredPosition);
+    currentTarget.copy(desiredTarget);
+
+    activeChapter = index;
+    syncActiveChapter();
+  }, WIPE_DURATION * WIPE_COVER_AT);
+
+  window.setTimeout(() => {
+    wiping = false;
+  }, WIPE_DURATION);
 }
 
 // ドラッグで少しだけ見回せるようにする。離すとゆっくり正面へ戻る。
@@ -316,7 +334,7 @@ function applyOrbit(position, target) {
 }
 
 function updateRailFromScroll() {
-  if (introState !== 'done') return;
+  if (introState !== 'done' || wiping) return;
   const scrollable = document.documentElement.scrollHeight - window.innerHeight;
   const ratio = scrollable > 0 ? window.scrollY / scrollable : 0;
   const progress = THREE.MathUtils.clamp(ratio, 0, 1) * (keyframes.length - 1);

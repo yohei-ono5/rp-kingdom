@@ -470,3 +470,56 @@ body:not([data-chapter='kingdom']) .scroll-hint {
     padding: 28px 24px;
   }
 }
+
+
+/* ---------- 章の切り替え(紙のワイプ + 章タイトル) ---------- */
+
+.wipe {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+/* 画面を横切る一枚の紙。前縁に金の罫線を入れる。 */
+.wipe__sheet {
+  position: absolute;
+  inset: 0;
+  transform: translateX(-105%);
+  background:
+    linear-gradient(to right, rgba(0, 0, 0, 0) 96%, rgba(27, 26, 23, 0.06) 100%),
+    radial-gradient(ellipse at 26% 18%, rgba(255, 255, 255, 0.6), transparent 60%),
+    var(--paper);
+  border-right: 1px solid var(--gold);
+  box-shadow: 12px 0 40px rgba(27, 26, 23, 0.14);
+}
+
+.wipe__label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  opacity: 0;
+  text-align: center;
+}
+
+.wipe__numeral {
+  font-family: var(--serif);
+  font-size: 12px;
+  letter-spacing: 0.42em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+
+.wipe__name {
+  font-family: var(--serif);
+  font-weight: 500;
+  font-size: clamp(46px, 7vw, 104px);
+  line-height: 1;
+  letter-spacing: 0.02em;
+  color: var(--ink);
+}
