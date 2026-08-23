@@ -42,12 +42,33 @@ export function createWorld({ canvas }) {
   const scene = new THREE.Scene();
   scene.fog = new THREE.Fog(PAPER, 95, 235);
 
-  const camera = new THREE.PerspectiveCamera(
-    34,
-    window.innerWidth / window.innerHeight,
-    0.1,
-    400
-  );
+  // 縦長の画面でも横方向の画角を保つ。単に aspect だけ変えると
+  // 望遠(34度)では左右が大きく切り落とされて構図が壊れる。
+  const BASE_FOV = 34;
+  const BASE_ASPECT = 16 / 9;
+
+  const camera = new THREE.PerspectiveCamera(BASE_FOV, BASE_ASPECT, 0.1, 400);
+
+  const applyViewportFraming = () => {
+    const aspect = window.innerWidth / window.innerHeight;
+    camera.aspect = aspect;
+
+    if (aspect < BASE_ASPECT) {
+      const baseHalf = THREE.MathUtils.degToRad(BASE_FOV) / 2;
+      const horizontalHalf = Math.atan(Math.tan(baseHalf) * BASE_ASPECT);
+      const preserved = THREE.MathUtils.radToDeg(
+        2 * Math.atan(Math.tan(horizontalHalf) / aspect)
+      );
+      // 完全に横を保つと縦長画面で被写体が小さくなりすぎるので 65% だけ補正する
+      camera.fov = THREE.MathUtils.lerp(BASE_FOV, preserved, 0.65);
+    } else {
+      camera.fov = BASE_FOV;
+    }
+
+    camera.updateProjectionMatrix();
+  };
+
+  applyViewportFraming();
 
   const renderer = new THREE.WebGLRenderer({
     canvas,
@@ -116,8 +137,7 @@ export function createWorld({ canvas }) {
   artDirection.applyToScene();
 
   window.addEventListener('resize', () => {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
+    applyViewportFraming();
     renderer.setSize(window.innerWidth, window.innerHeight);
   }, { passive: true });
 
