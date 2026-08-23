@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>The Kingdom Edition</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600&family=Noto+Serif+JP:wght@300;400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./assets/css/editions.css" />
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.158.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.158.0/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body data-chapter="kingdom">
+  <canvas id="world-canvas"></canvas>
+  <div class="veil veil--top"></div>
+  <div class="veil veil--left"></div>
+
+  <header class="masthead">
+    <div class="masthead__brand">
+      <span class="masthead__title">Rujie</span>
+      <span class="masthead__edition">The Kingdom Edition</span>
+    </div>
+    <a class="masthead__cta" href="#chapter-land">Own a plot</a>
+  </header>
+
+  <nav class="chapter-index" id="chapter-index" aria-label="Chapters"></nav>
+
+  <main id="chapters"></main>
+
+  <div class="scroll-hint">Scroll to travel</div>
+
+  <script type="module" src="./assets/js/editions/main.js"></script>
+</body>
+</html>
