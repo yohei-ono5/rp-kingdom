@@ -22,6 +22,13 @@ const ORBIT_MAX_PITCH = THREE.MathUtils.degToRad(11);
 const ORBIT_SENSITIVITY = 0.0032;
 const ORBIT_RECENTER = 0.012;
 
+// ブラウザはリロードや戻る操作でスクロール位置を復元する。
+// そのままだと ENTER 直後に前回いた章へ飛んでしまうので、必ず先頭から始める。
+if ('scrollRestoration' in history) {
+  history.scrollRestoration = 'manual';
+}
+window.scrollTo(0, 0);
+
 const canvas = document.getElementById('world-canvas');
 const world = createWorld({ canvas });
 
@@ -169,8 +176,11 @@ function updateIntroFlight(now) {
   if (linear >= 1) {
     introState = 'done';
     document.body.classList.remove('is-intro');
+    window.scrollTo(0, 0);
     desiredPosition.copy(keyframes[0].position);
     desiredTarget.copy(keyframes[0].target);
+    activeChapter = 0;
+    syncActiveChapter();
     updateRailFromScroll();
   }
 }
@@ -502,7 +512,7 @@ function buildDepartureSplash(url, label) {
   .kicker { font-size: 11px; letter-spacing: 0.42em; text-transform: uppercase; color: #c9a227; }
   .name { font-size: clamp(34px, 5vw, 68px); font-weight: 500; line-height: 1.08; text-align: center; padding: 0 24px; }
   .seam { width: 1px; height: 84px; background: linear-gradient(to bottom, transparent, #c9a227, transparent); }
-  body > * { animation: rise 620ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+  body > * { animation: rise 260ms cubic-bezier(0.16, 1, 0.3, 1) both; }
   @keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
 </style></head>
 <body>
@@ -516,7 +526,7 @@ function buildDepartureSplash(url, label) {
     // 遷移先から元のタブを触れないようにしてから送り出す
     try { window.opener = null; } catch (error) {}
     location.replace(target.url);
-  }, 900);
+  }, 450);
 <\/script>
 </body></html>`;
 }
