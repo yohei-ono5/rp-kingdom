@@ -12,12 +12,15 @@ import {
   createWell,
   updateGrass
 } from './props.js';
+import { createMountainRange } from './terrain.js';
+import { createRiver, createRiverBank, createSea, updateWater } from './water.js';
 
 // 手続き生成の見本を、既存の購入モデルと並べて見比べるためのページ。
 // 本編(editions.html)と同じライティング・同じアートディレクション層を通すので、
 // ここで成立すれば本編にそのまま持ち込める。
 
 const PAPER = 0xf2e6cf;
+const ISLAND_RADIUS = 36;
 const HOUSE_MODEL = new URL('../../models/Fantasy_House_6.glb', import.meta.url).href;
 const TREE_MODEL = new URL('../../models/tree_LOD0.glb', import.meta.url).href;
 
@@ -25,10 +28,10 @@ const canvas = document.getElementById('lab-canvas');
 const labelLayer = document.getElementById('labels');
 
 const scene = new THREE.Scene();
-scene.fog = new THREE.Fog(PAPER, 60, 150);
+scene.fog = new THREE.Fog(PAPER, 110, 300);
 
-const camera = new THREE.PerspectiveCamera(38, window.innerWidth / window.innerHeight, 0.1, 400);
-camera.position.set(4, 13, 30);
+const camera = new THREE.PerspectiveCamera(38, window.innerWidth / window.innerHeight, 0.1, 700);
+camera.position.set(6, 22, 52);
 
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
@@ -51,10 +54,12 @@ initGround();
 
 const labels = [];
 const grassPatches = [];
+const waterMeshes = [];
 
 buildBuildingRow();
 buildTreeRow();
 buildPropRow();
+buildTerrainAndWater();
 
 artDirection.applyToScene();
 
@@ -70,6 +75,7 @@ requestAnimationFrame(function frame() {
   requestAnimationFrame(frame);
   const elapsed = clock.getElapsedTime();
   grassPatches.forEach((patch) => updateGrass(patch, elapsed));
+  waterMeshes.forEach((mesh) => updateWater(mesh, elapsed));
   controls.update();
   renderer.render(scene, camera);
   updateLabels();
@@ -96,12 +102,22 @@ function initLighting() {
 
 function initGround() {
   const ground = new THREE.Mesh(
-    new THREE.CircleGeometry(46, 72),
-    new THREE.MeshStandardMaterial({ color: 0x87927a, roughness: 1, metalness: 0 })
+    new THREE.CircleGeometry(ISLAND_RADIUS, 84),
+    new THREE.MeshStandardMaterial({ color: 0x5d7f45, roughness: 1, metalness: 0 })
   );
   ground.rotation.x = -Math.PI / 2;
   ground.receiveShadow = true;
   scene.add(ground);
+
+  // 草地が海へ直に落ちると硬いので、縁に砂の帯を挟む
+  const shore = new THREE.Mesh(
+    new THREE.RingGeometry(ISLAND_RADIUS - 2.4, ISLAND_RADIUS + 1.2, 84),
+    new THREE.MeshStandardMaterial({ color: 0xcbb894, roughness: 1, metalness: 0 })
+  );
+  shore.rotation.x = -Math.PI / 2;
+  shore.position.y = 0.008;
+  shore.receiveShadow = true;
+  scene.add(shore);
 }
 
 // ---- 建物 ----
@@ -210,6 +226,44 @@ function buildPropRow() {
   scene.add(grass);
   grassPatches.push(grass);
   addLabel('草むら (風で揺れる)', new THREE.Vector3(13, 1.2, z));
+}
+
+// ---- 山・川・海 ----
+function buildTerrainAndWater() {
+  // 海。島より少し低い位置に敷いて、島が水面から出ているようにする。
+  const sea = createSea({ size: 340, segments: 96, waveHeight: 0.5 });
+  sea.position.y = -0.55;
+  scene.add(sea);
+  waterMeshes.push(sea);
+  addLabel('海（うねりと泡はシェーダ）', new THREE.Vector3(26, 1.6, 34));
+
+  // 山脈。裾野を海面より下に沈めると、なだらかな台座が水に隠れて稜線だけが立つ。
+  const mountains = createMountainRange({
+    seed: 12,
+    width: 150,
+    depth: 54,
+    maxHeight: 26,
+    peakCount: 8
+  });
+  mountains.position.set(0, -1.4, -52);
+  scene.add(mountains);
+  addLabel('山（高さマップ＋雪冠）', new THREE.Vector3(-18, 27, -52));
+
+  // 川。山から島を抜けて海へ注ぐ。
+  const riverPoints = [
+    [-25, 0.03, -34],
+    [-23, 0.03, -22],
+    [-26, 0.03, -10],
+    [-22, 0.03, 2],
+    [-25, 0.03, 14],
+    [-21, 0.03, 26],
+    [-23, 0.03, 42]
+  ];
+  const river = createRiver({ points: riverPoints, width: 3.6, waveHeight: 0.12 });
+  scene.add(river);
+  waterMeshes.push(river);
+  scene.add(createRiverBank(river.userData.curve, { width: 3.6, count: 110, seed: 4 }));
+  addLabel('川（流れと岸の泡）', new THREE.Vector3(-23, 2.2, 6));
 }
 
 // ---- 読み込みと表示ラベル ----
