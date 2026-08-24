@@ -55,7 +55,7 @@ export const CHAPTERS = [
     body: '風車は今日も回る。日々の景色は Instagram で。',
     cta: { text: 'Instagram', url: 'https://www.instagram.com/rujie.official/' },
     side: 'right',
-    camera: { position: [-45, 18, 35], target: [-20.4, 6.5, 6.0] }
+    camera: { position: [-14, 8, -6], target: [-20.4, 4.2, 6.0] }
   },
   {
     id: 'film',
@@ -68,7 +68,7 @@ export const CHAPTERS = [
     body: '広場のスクリーンには、最新の映像が流れている。',
     cta: { text: 'YouTube Channel', url: 'https://www.youtube.com/@Rujie-official' },
     side: 'left',
-    camera: { position: [3, 12, 44], target: [-12, 3.2, 18] }
+    camera: { position: [-6.5, 5.4, 24.0], target: [-15, 3.0, 18] }
   },
   {
     id: 'company',
@@ -79,7 +79,7 @@ export const CHAPTERS = [
     body: 'この王国をつくる会社、The Crown Production。',
     cta: { text: 'The Crown Production', url: 'https://thecrown-pro.com/' },
     side: 'right',
-    camera: { position: [15, 12, 25], target: [-4.5, 2.0, -1.8] }
+    camera: { position: [5, 9, -18], target: [-4.5, 4.5, -1.8] }
   },
   {
     id: 'land',
