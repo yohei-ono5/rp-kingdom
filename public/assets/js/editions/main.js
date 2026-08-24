@@ -21,6 +21,12 @@ const ORBIT_MAX_YAW = THREE.MathUtils.degToRad(20);
 const ORBIT_MAX_PITCH = THREE.MathUtils.degToRad(11);
 const ORBIT_SENSITIVITY = 0.0032;
 const ORBIT_RECENTER = 0.012;
+// 俯瞰マップ。村の中心の真上近くから見下ろす。完全な真上だとカメラの向き計算が
+// 不安定になりやすいので、わずかに手前へずらして角度をつけている。
+const MAP_KEYFRAME = {
+  position: new THREE.Vector3(-4, 64, 11),
+  target: new THREE.Vector3(-4, 0, 6)
+};
 
 // ブラウザはリロードや戻る操作でスクロール位置を復元する。
 // そのままだと ENTER 直後に前回いた章へ飛んでしまうので、必ず先頭から始める。
@@ -53,6 +59,7 @@ let introState = 'waiting';
 let jump = null;
 let departing = false;
 let departure = null;
+let mapMode = false;
 const orbit = { yaw: 0, pitch: 0, dragging: false, lastX: 0, lastY: 0, moved: 0 };
 const orbitOffset = new THREE.Vector3();
 const orbitSpherical = new THREE.Spherical();
@@ -93,6 +100,7 @@ window.addEventListener('resize', updateRailFromScroll, { passive: true });
 bindWorldPicking();
 bindOrbit();
 bindMastheadLink();
+bindMapToggle();
 updateRailFromScroll();
 
 function startIntro() {
@@ -185,12 +193,20 @@ function updateIntroFlight(now) {
   }
 }
 
+// 章の id は、世界の中のオブジェクトの id (world.anchors のキー) と基本一致する。
+// Film 章だけ看板の id が異なるので anchorId で読み替える。
+function chapterIndexForAnchor(id) {
+  return CHAPTERS.findIndex((chapter) => (chapter.anchorId || chapter.id) === id);
+}
+
 // 建物を直接クリックしてその章へ飛べるようにする。
 // スクロールでの巡回は残したまま、「選ぶ」操作を足す。
+// カメラの角度に依存しないレイキャストなので、俯瞰マップでもそのまま機能する。
 function bindWorldPicking() {
   const raycaster = new THREE.Raycaster();
   const pointer = new THREE.Vector2();
   const canvas = world.renderer.domElement;
+  const tooltip = document.getElementById('map-tooltip');
   let pressedAt = null;
   let lastHoverCheck = 0;
 
@@ -215,7 +231,22 @@ function bindWorldPicking() {
     // 毎フレームのレイキャストは無駄なので間引く
     if (now - lastHoverCheck < 90) return;
     lastHoverCheck = now;
-    canvas.classList.toggle('is-pointing', Boolean(pickAt(event)));
+
+    const id = pickAt(event);
+    canvas.classList.toggle('is-pointing', Boolean(id));
+
+    // ツールチップは俯瞰マップでの「凡例」として出す。斜めの通常表示では
+    // パネルに章名が出ているので、ここでは重ねて出さない。
+    if (!tooltip) return;
+    const index = id && mapMode ? chapterIndexForAnchor(id) : -1;
+    if (index < 0) {
+      tooltip.classList.remove('is-visible');
+      return;
+    }
+    tooltip.textContent = CHAPTERS[index].label;
+    tooltip.style.left = `${event.clientX}px`;
+    tooltip.style.top = `${event.clientY}px`;
+    tooltip.classList.add('is-visible');
   }, { passive: true });
 
   window.addEventListener('pointerdown', (event) => {
@@ -231,18 +262,58 @@ function bindWorldPicking() {
     const id = pickAt(event);
     if (!id) return;
 
-    const index = CHAPTERS.findIndex(
-      (chapter) => (chapter.anchorId || chapter.id) === id
-    );
+    const index = chapterIndexForAnchor(id);
     if (index < 0) return;
 
     navigateToChapter(index);
   }, { passive: true });
 }
 
+// 俯瞰マップの開閉。ボタンでも、マップ表示中に村の外側をクリックしても閉じる。
+function bindMapToggle() {
+  const toggle = document.getElementById('map-toggle');
+  toggle?.addEventListener('click', () => {
+    if (mapMode) {
+      exitMapMode();
+    } else {
+      enterMapMode();
+    }
+  });
+
+  window.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && mapMode) exitMapMode();
+  });
+}
+
+function enterMapMode() {
+  if (introState !== 'done' || mapMode || jump) return;
+  mapMode = true;
+  document.body.classList.add('is-map');
+
+  jump = {
+    startedAt: performance.now(),
+    fromPosition: currentPosition.clone(),
+    fromTarget: currentTarget.clone(),
+    toPosition: MAP_KEYFRAME.position.clone(),
+    toTarget: MAP_KEYFRAME.target.clone()
+  };
+}
+
+// 建物をクリックして章へ飛ぶときも、ボタンで閉じるときも、
+// 最終的にはここを通って俯瞰状態を解除する。
+function exitMapMode(index = activeChapter) {
+  navigateToChapter(index);
+}
+
 // レール上を辿ると間の章のカメラ位置を全部経由してしまい、行ったり来たりに見える。
 // 直接クリックしたときは現在地から目的地へ直行させる。
 function navigateToChapter(index) {
+  // マップを開いていた場合はここで閉じる。is-intro と同じく、overflow を戻して
+  // からでないと scrollTo が効かないブラウザがあるので順序が重要。
+  mapMode = false;
+  document.body.classList.remove('is-map');
+  document.getElementById('map-tooltip')?.classList.remove('is-visible');
+
   const scrollable = document.documentElement.scrollHeight - window.innerHeight;
   window.scrollTo({
     top: (index / (keyframes.length - 1)) * scrollable,
@@ -274,7 +345,9 @@ function updateJump(now) {
     jump = null;
     desiredPosition.copy(currentPosition);
     desiredTarget.copy(currentTarget);
-    updateRailFromScroll();
+    // マップへ入るジャンプの場合は俯瞰位置に留まる。rail を呼ぶと即座に
+    // 現在の章のカメラへ引き戻されてしまう。
+    if (!mapMode) updateRailFromScroll();
   }
 }
 
@@ -333,7 +406,7 @@ function applyOrbit(position, target) {
 }
 
 function updateRailFromScroll() {
-  if (introState !== 'done' || jump) return;
+  if (introState !== 'done' || jump || mapMode) return;
   const scrollable = document.documentElement.scrollHeight - window.innerHeight;
   const ratio = scrollable > 0 ? window.scrollY / scrollable : 0;
   const progress = THREE.MathUtils.clamp(ratio, 0, 1) * (keyframes.length - 1);

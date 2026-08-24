@@ -38,7 +38,13 @@
       <span class="masthead__title">Rujie</span>
       <span class="masthead__edition">The Kingdom Edition</span>
     </div>
-    <a class="masthead__cta" href="#chapter-land">Own a plot</a>
+    <div class="masthead__actions">
+      <button class="masthead__map" id="map-toggle" type="button">
+        <span class="masthead__map-open">Map</span>
+        <span class="masthead__map-close">Close Map</span>
+      </button>
+      <a class="masthead__cta" href="#chapter-land">Own a plot</a>
+    </div>
   </header>
 
   <nav class="chapter-index" id="chapter-index" aria-label="Chapters"></nav>
@@ -46,6 +52,9 @@
   <main id="chapters"></main>
 
   <div class="scroll-hint">Scroll to travel</div>
+
+  <div class="map-hint" id="map-hint">Click a building to enter</div>
+  <div class="map-tooltip" id="map-tooltip"></div>
 
   <div class="depart" id="depart" aria-hidden="true">
     <div class="depart__panel depart__panel--left"></div>
