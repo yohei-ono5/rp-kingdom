@@ -120,6 +120,7 @@ requestAnimationFrame(function frame() {
   lastFrameAt = now;
 
   world.clouds.update(deltaSeconds);
+  world.updateGrass(deltaSeconds);
 
   if (introState === 'flying') {
     updateIntroFlight(now);

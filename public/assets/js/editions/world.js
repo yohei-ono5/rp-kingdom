@@ -6,10 +6,11 @@ import {
   VIDEO_BILLBOARDS
 } from '../site-config.js';
 import { initRoads } from '../scene/roads.js';
-import { createTreeExclusions, initTrees } from '../scene/trees.js';
+import { createTreeExclusions, initTrees, isInExclusion } from '../scene/trees.js';
 import { loadWorldObjects } from '../scene/world-objects.js';
 import { initVideoBillboards, updateVideoBillboardPlayback } from '../scene/video-billboards.js';
 import { createArtDirection } from '../systems/art-direction.js';
+import { createGrassPatch, updateGrass } from '../procedural/props.js';
 
 // Editions 版のワールド。
 // 3D は「紙の上に置かれた挿画」として扱うので、背景は描かず canvas を透過させる。
@@ -41,6 +42,20 @@ const WEST_TREE_SCATTER_EDITIONS = Object.freeze({
   centerClearRadius: 0,
   scaleRange: [0.32, 0.56]
 });
+
+// site-config.js は旧サイト(index.html)とも共有しているため、そちら側の
+// 向きは変えられない。風車の正面(元の rotationY)は北を向いており、
+// その先は密な茂みで恒常的に塞がれてしまうため、Editions 側の見た目だけを
+// 南東の開けた方向へ回転させる。tree-exclusion は位置のみで判定しており
+// 回転には依存しないので、これは安全な上書き。
+const HOUSE_ROTATION_OVERRIDES = Object.freeze({
+  sns: -Math.PI / 4
+});
+
+function withEditionsRotation(house) {
+  const override = HOUSE_ROTATION_OVERRIDES[house.id];
+  return override === undefined ? house : { ...house, rotationY: override };
+}
 
 export function createWorld({ canvas }) {
   const scene = new THREE.Scene();
@@ -115,7 +130,7 @@ export function createWorld({ canvas }) {
     clickTargets: []
   });
 
-  const destinations = [...HOUSE_DESTINATIONS, FRONT_HOUSE_DESTINATION];
+  const destinations = [...HOUSE_DESTINATIONS, FRONT_HOUSE_DESTINATION].map(withEditionsRotation);
   const anchors = new Map();
   const anchorsSeed = [];
 
@@ -156,6 +171,11 @@ export function createWorld({ canvas }) {
       .catch((error) => console.error('Failed to scatter trees.', error))
   );
 
+  // 平地が単調に見えないよう、開けた場所に草むらを点在させる。
+  // 家・道・看板の除外ゾーンは木と共有しているので、そこには生えない。
+  const grassPatches = scatterGrassPatches({ parentGroup: worldGroup, exclusions });
+  let grassElapsed = 0;
+
   // ENTER を押せるようになる条件。建物と木が揃うまで待つ。
   const ready = Promise.all([worldObjectsReady, ...treesReady]);
 
@@ -187,6 +207,11 @@ export function createWorld({ canvas }) {
     setFogRange(near, far) {
       scene.fog.near = near;
       scene.fog.far = far;
+    },
+    // 草むらの揺れは頂点シェーダ側で完結しており、JS 側は経過時間を渡すだけ。
+    updateGrass(deltaSeconds) {
+      grassElapsed += deltaSeconds;
+      grassPatches.forEach((patch) => updateGrass(patch, grassElapsed));
     },
     render() {
       renderer.render(scene, camera);
@@ -237,6 +262,45 @@ function extendPastEdge(inner, outer) {
   return [outer[0] + nx * step, 0, outer[2] + nz * step];
 }
 
+// 開けた草地に候補点をばら撒き、家・道・看板の除外ゾーンに掛かるものだけ捨てる。
+// 木の散布と同じ isInExclusion を使い回すので、木を避けている場所は草も避ける。
+const GRASS_CLUSTER_SEED = 0x9a55f2;
+const GRASS_CLUSTER_CANDIDATES = 22;
+const GRASS_CLUSTER_TARGET = 9;
+const GRASS_BOUNDS = Object.freeze({ minX: -30, maxX: 26, minZ: -30, maxZ: 26 });
+
+function scatterGrassPatches({ parentGroup, exclusions }) {
+  const random = createSeededRandom(GRASS_CLUSTER_SEED);
+  const patches = [];
+
+  for (
+    let attempt = 0;
+    attempt < GRASS_CLUSTER_CANDIDATES && patches.length < GRASS_CLUSTER_TARGET;
+    attempt += 1
+  ) {
+    const x = THREE.MathUtils.lerp(GRASS_BOUNDS.minX, GRASS_BOUNDS.maxX, random());
+    const z = THREE.MathUtils.lerp(GRASS_BOUNDS.minZ, GRASS_BOUNDS.maxZ, random());
+
+    if (Math.hypot(x, z) > ISLAND_RADIUS * 0.86) continue;
+    // 除外ゾーンの縁ぎりぎりだと株の半径がはみ出すので少し余裕を持たせる
+    if (isInExclusion(x, z, exclusions) || isInExclusion(x + 1.6, z, exclusions)) continue;
+
+    const patch = createGrassPatch({
+      seed: GRASS_CLUSTER_SEED + patches.length * 97,
+      count: 130 + Math.floor(random() * 90),
+      radius: 1.6 + random() * 1.6,
+      // props.js の既定色は薄く、この島の低い夕方光では逆光の縁だけが
+      // 白く飛んで霜のように見えてしまう。少し濃く彩度を上げて締める。
+      color: 0x5f7a45
+    });
+    patch.position.set(x, 0.01, z);
+    parentGroup.add(patch);
+    patches.push(patch);
+  }
+
+  return patches;
+}
+
 function initLighting(scene) {
   // 環境光は絞り、太陽1灯で形を作る。影が伸びるマジックアワーの角度で固定。
   scene.add(new THREE.AmbientLight(0xfff0d8, 0.34));
@@ -280,6 +344,7 @@ function createIslandTop() {
 
   const positions = [];
   const colors = [];
+  const uvs = [];
   const indices = [];
 
   const grass = new THREE.Color(0x87927a);
@@ -310,6 +375,9 @@ function createIslandTop() {
       // 縁だけ落として丸みをつける。中央は完全に平坦(建物や道が浮かないように)。
       const edge = THREE.MathUtils.smoothstep(radiusRatio, ISLAND_EDGE_START, 1);
       positions.push(x, -edge * ISLAND_EDGE_DROP, z);
+      // ワールド座標をそのまま UV にする。頂点グリッドの粗さと関係なく
+      // テクスチャ側の解像度だけで近接ディテールを出せる。
+      uvs.push(x / GROUND_TEXTURE_TILE, z / GROUND_TEXTURE_TILE);
 
       let shade = 1;
       patches.forEach((patch) => {
@@ -338,6 +406,7 @@ function createIslandTop() {
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
   geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
   geometry.setIndex(indices);
   // ほぼ平坦な円盤なので法線は真上で固定する。
   // computeVertexNormals は巻き順に依存して裏返りやすいため使わない。
@@ -349,12 +418,68 @@ function createIslandTop() {
     geometry,
     new THREE.MeshStandardMaterial({
       vertexColors: true,
+      map: createGroundDetailTexture(),
       roughness: 1,
       metalness: 0
     })
   );
   top.receiveShadow = true;
   return top;
+}
+
+// 頂点カラーの斑点(半径6〜20)だけだと近づいたときに平坦に見える。
+// 頂点グリッドとは独立に、細かい草むらの粒立ちをテクスチャで乗算する。
+const GROUND_TEXTURE_TILE = 3.4;
+
+function createGroundDetailTexture() {
+  const size = 256;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const context = canvas.getContext('2d');
+
+  context.fillStyle = '#ffffff';
+  context.fillRect(0, 0, size, size);
+
+  const random = createSeededRandom(0x67a55);
+
+  // 草の房を模した小さな塊を多数散らす。タイル境界でも切れないよう
+  // 周囲8方向にもコピーして描く。
+  for (let index = 0; index < 340; index += 1) {
+    const bx = random() * size;
+    const by = random() * size;
+    const radius = 2 + random() * 7;
+    const shade = 0.72 + random() * 0.5;
+
+    for (const ox of [0, size, -size]) {
+      for (const oy of [0, size, -size]) {
+        const gradient = context.createRadialGradient(
+          bx + ox, by + oy, 0,
+          bx + ox, by + oy, radius
+        );
+        gradient.addColorStop(0, `rgba(${shade < 1 ? '90,80,50' : '235,240,210'},${Math.abs(shade - 1) * 0.9})`);
+        gradient.addColorStop(1, 'rgba(0,0,0,0)');
+        context.fillStyle = gradient;
+        context.beginPath();
+        context.arc(bx + ox, by + oy, radius, 0, Math.PI * 2);
+        context.fill();
+      }
+    }
+  }
+
+  // ざらつきを足す細かい粒
+  for (let index = 0; index < 1400; index += 1) {
+    const shade = 150 + Math.floor(random() * 90);
+    context.fillStyle = `rgba(${shade},${shade + 6},${shade - 10},${0.06 + random() * 0.1})`;
+    context.fillRect(random() * size, random() * size, 1, 1);
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = 4;
+  return texture;
 }
 
 function createIslandSide() {
