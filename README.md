@@ -2,7 +2,14 @@
 
 Three.js を使った絵本風 3D 村の試作です。`public/assets/models/Fantasy_House_6.glb`、`public/assets/models/Fantasy_House.glb`、`public/assets/models/windmill_2048_ktx2.glb` を配置し、通常ビューと MAP ビューを切り替えられる構成にしています。Cloudflare Pages で公開する静的サイトですが、大きな GLB / mp4 は Cloudflare R2 から配信する想定です。
 
-## 現在の構成
+公開物は 2 系統あります。
+
+- `public/index.html`: 従来の村ビュー版（下の「現在の構成（index.html）」で説明）
+- `public/editions.html`: スクロール連動の浮島ポータル「The Kingdom Edition」。現在の開発の主軸（「The Kingdom Edition」の節で説明）
+
+どちらも `site-config.js` を共有します。
+
+## 現在の構成（index.html）
 
 ### 画面遷移と導線
 
@@ -49,6 +56,36 @@ Three.js を使った絵本風 3D 村の試作です。`public/assets/models/Fan
 - タブ非表示時は描画ループを停止し、通常アイドル時（MAP を含む）は 20fps 相当に間引く。イントロ、カメラ遷移、ポップアップ、操作直後は 60fps 相当に戻す
 - イントロの粒子形成が完了した後は粒子オブジェクトを非表示にし、更新処理を早期 return して常時負荷を下げる
 
+## The Kingdom Edition（`editions.html`）
+
+1 つの世界に区画（= 章）を広告枠として並べ、複数の出稿者を同居させるポータルです。章を 1 件足すと、左のインデックス・本文パネル・カメラ位置・CTA が自動で増えます（現状の想定は 7 枠）。
+
+### 体験の流れ
+
+- `ENTER` は建物と木の読み込みが終わるまで押せません（表示は `Loading the kingdom` → `Press Enter`）。押すと雲の上から約 4 秒で島へ降下します
+- 常に Kingdom 章（冒頭の全景）から始まります。リロード時のスクロール位置復元は無効化しています
+- スクロールでカメラが章ごとのキーフレーム間を移動します。章と章の間は少し持ち上げて建物を避け、無操作でもカメラがわずかに呼吸します
+- 建物・看板のクリック、左のインデックス、`Own a plot` のいずれでも、現在地から目的の章へカメラが直行します（間の章を経由しません）
+- ドラッグで左右 ±20° / 上下 ±11° まで見回せます。離すと正面へ戻ります
+- `MAP` で村の真上近くからの俯瞰に切り替わります。建物にホバーすると章名、クリックでその章へ降ります。`Esc` かもう一度 `MAP` で元の章へ戻ります。MAP 中はスクロールで章が動きません
+- CTA ボタンは新規タブで開きます。新規タブ側に「Departing 〇〇」の画面を出し、約 0.45 秒後に遷移先へ置き換えます（ポップアップブロック回避のため、タブはクリックと同時に開きます）。ブロックされた場合のみ、紙の扉が閉じる演出のあと同一タブで遷移します。⌘ / Ctrl / Shift / 中クリックは演出なしで通常のリンクとして開きます
+- Film 章の動画は、章の前後 1 つ以内に来るまで読み込みません。それまでは `posterUrl` の静止画を看板に表示します
+
+### 世界の作り
+
+- 島は半径 44 の円盤と岩肌の側面です。canvas は透過で、背景は紙色の CSS。遠景はフォグで紙の色に溶かします
+- 地面は「頂点カラーの斑点」に「ワールド座標 UV のタイルテクスチャ」を乗算し、さらに草むらクラスタ（`procedural/props.js` の `createGrassPatch`）を家・道・看板の除外ゾーンを避けて散布しています
+- 質感は `systems/art-direction.js` が全マテリアルへ脱彩度と階調化を注入して統一します
+- 太陽は固定のため `shadowMap.autoUpdate = false`（毎フレームの影パスなし）
+- 風車だけ、Editions 側で `rotationY` を上書きしています（`site-config.js` は旧サイトと共有のため触りません）。正面（北向き）が密な茂みと Music ハウスで塞がれるためです
+
+### 未対応
+
+- 多言語（章の原稿は日本語固定、UI の英字ラベルも直書き。`i18n.js` に接続していません）
+- 時間帯連動（照明・太陽は固定のマジックアワー）
+- 売地（`LAND_PLOTS`）の 3D オブジェクト配置
+- スマホ実機での検証、ポストプロセス（Bloom 等）、GLB の追加圧縮
+
 ## 起動
 
 `public/` を静的配信して確認する想定です。VS Code の Live Server などを使う場合は `public/index.html` を起点にしてください。
@@ -62,13 +99,32 @@ python3 -m http.server 5500
 
 ライティング確認は `http://localhost:5500/?hour=20` のように `hour` クエリで時刻固定できます。
 
+| URL | 内容 |
+| --- | --- |
+| `/index.html` | 従来の村ビュー版 |
+| `/editions.html` | The Kingdom Edition |
+| `/procedural.html` | 手続き生成（建物・木・小物・山・川・海・草）を既存の購入モデルと並べて見比べる検証ページ |
+
+クエリパラメータ:
+
+- `?style=toon|pbr|current`: 質感の切り替え（`index.html` / `editions.html` / `procedural.html` で有効）。**既定は `toon`** で、`index.html` も既定でトゥーン調になります。以前の見た目に戻すときは `?style=current`
+- `?fov=<15-80>`: カメラ画角の上書き（`index.html` のみ、既定 50）
+- `?hour=<0-23>`: 時刻固定（`index.html` のみ。Editions は時間帯連動なし）
+
 ## ディレクトリ構成
 
 - `public/`: Cloudflare Pages にそのまま配信する公開物
 - `public/index.html`: ナビ、HUD、イントロ、時計、Languageメニュー、コンパス、MAPラベル、ツールチップ、売地パネルのマークアップとスタイル
-- `public/assets/image/`: イントロなどで使う画像アセット（`intro-logo.jpg`）
+- `public/editions.html` / `public/assets/css/editions.css`: The Kingdom Edition のマークアップとスタイル（紙・墨・金の3色、Cormorant Garamond + Noto Serif JP）
+- `public/procedural.html`: 手続き生成の検証ページ
+- `public/assets/image/`: 画像アセット（イントロの `intro-logo.jpg`、動画看板のサムネ `youtube-promo-poster.jpg`）
 - `public/assets/js/main.js`: 起動処理、シーン/カメラ/ライト構築、ビュー状態管理、アニメーションループ、省電力用の FPS 間引きとタブ非表示時停止
-- `public/assets/js/site-config.js`: 建物/看板/売地のID、遷移先 URL、配置、ドア設定、サイズ、動画 URL など非表示設定の定義
+- `public/assets/js/editions/chapters.js`: Editions の章の定義（1 章 = 1 つの遷移先 = 販売可能な 1 区画）。原稿、CTA、パネルの左右、カメラのキーフレーム
+- `public/assets/js/editions/main.js`: Editions の起動、スクロール連動のカメラレール、ENTER ゲートと降下、建物クリック、MAP、外部サイトへの離脱演出
+- `public/assets/js/editions/world.js`: Editions の世界（浮島、雲、ライティング、道路の延長、草むら、建物・木・看板の配置）
+- `public/assets/js/systems/art-direction.js`: 全マテリアルを共通の質感へ染める層（`?style=` で toon / pbr / current）
+- `public/assets/js/procedural/`: 手続き生成のジェネレータ（`building` / `tree` / `props` / `terrain` / `water`、共通部品 `common`、検証ページ用 `lab`）。本編で使っているのは `props.js` の草むらのみ
+- `public/assets/js/site-config.js`: 建物/看板/売地のID、遷移先 URL、配置、ドア設定、サイズ、動画 URL（看板のサムネ `posterUrl` を含む）など非表示設定の定義。`index.html` と `editions.html` で共有
 - `public/assets/js/i18n.js`: Languageメニュー、ナビ、HUD、ポップアップ、時計ラベル、建物/看板名、売地文言の多言語辞書
 - `public/assets/js/camera/focus-camera.js`: ドア基点のフォーカスカメラ算出、ワールド→スクリーン投影
 - `public/assets/js/camera/transition-paths.js`: `intro-enter` / `map-enter` / `map-exit` のベジェ軌道生成
@@ -79,11 +135,13 @@ python3 -m http.server 5500
 - `public/assets/js/scene/video-billboards.js`: 動画看板の3D生成（フレーム + スクリーン + 支柱）、`VideoTexture` 管理、autoplay フォールバック、村ビュー/MAP/タブ状態に応じた再生制御
 - `public/assets/js/scene/particle-field.js`: イントロ時に家・看板・地面へ集まる形成粒子の生成、パステル色化、形成完了後の非表示制御
 - `public/assets/js/scene/sky-objects.js`: 夜の星空と月（カメラ追従）の生成と表示制御
+- `public/assets/js/scene/trees.js`: 木の散布とインスタンス描画、散布除外ゾーンの生成（`createTreeExclusions` / `isInExclusion`）。Editions の草むら散布も同じ除外ゾーンを使う
+- `public/assets/js/scene/environment.js` / `scene/sky-dome.js`: 山脈・丘・茂み・花、スカイドームと雲。**どこからも読み込まれていない未接続のモジュール**
 - `public/assets/js/systems/time-of-day.js`: `Asia/Tokyo` の取得、時間帯ライティング/太陽位置補間、時計 UI 更新
 - `public/assets/js/ui/link-popup.js`: 建物ドア／看板上に追従する確認ポップアップの生成と表示制御。単一リンクと複数リンク選択（Music の `Spotify` / `Apple Music`）に対応
-- `public/assets/models/`: 配信するGLBアセット（`Fantasy_House_6.glb`, `Fantasy_House.glb`, `windmill_2048_ktx2.glb`, `tree_LOD0.glb`）。`windmill.glb` と `windmill_2048.glb` はローカル変換用で `.gitignore` 対象
+- `public/assets/models/`: 配信するGLBアセット（`Fantasy_House_6.glb`, `Fantasy_House.glb`, `windmill_2048_ktx2.glb`, `tree_LOD0.glb`）。`windmill.glb` と `windmill_2048.glb` はローカル変換用で `.gitignore` 対象。`tree_1_LOD1.fbx` / `tree_1_LOD2.fbx` は追跡されているがどこからも参照されていない
 - `public/assets/movie/`: 動画看板用 mp4 のローカル置き場（`*.mp4` は `.gitignore` で除外、本番は Cloudflare R2 から配信）
-- `resources/`: 公開対象に含めない素材置き場
+- `resources/`: 公開対象に含めない素材置き場（現在は空）
 - `docs/`: 開発メモ
 
 ## 文言/配置管理
@@ -99,6 +157,8 @@ python3 -m http.server 5500
 - 売地/広告枠区画のサイズ、配置を変える
 - 道路の経路と幅は `ROAD_PATHS` の `points` / `width` を変える。木の配置は `TREE_SCATTER`（主に北側）と `WEST_TREE_SCATTER`（西側追加）を変える
 - 動画看板の `position` / `rotationY` / `width` / `height`、再生する動画 URL（`videoUrl`、R2 など外部 CDN 推奨）、遷移先 URL（`url`）を変える
+
+Editions の編集先は別です。章の原稿・CTA・パネルの左右・カメラは `editions/chapters.js`、Editions だけの建物の向きの上書きは `editions/world.js` の `HOUSE_ROTATION_OVERRIDES` です。`site-config.js` は `index.html` と共有なので、Editions のためだけに配置や向きを変えないでください。
 
 `site-config.js` の `id` と `i18n.js` の `destinations.<id>` / `plots.<id>` は対応しています。建物や看板を追加するときは、`site-config.js` に配置やURLを追加し、同じ `id` で `i18n.js` に表示文言を追加してください。`HOUSE_DESTINATIONS` は通常ハウス、`FRONT_HOUSE_DESTINATION` は前面のアーティストハウス、`VIDEO_BILLBOARDS` は動画看板の定義です。`Music` のように複数の遷移先を出す場合は `url` の代わりに `links` を使います。
 
@@ -237,3 +297,16 @@ Content-Type: video/mp4
 21. 通常ビューでホイール／ピンチで MAP 高度近くまで手動ズームアウトできる
 22. 建物表面が半透明に抜けず、前後関係が破綻しない
 23. `Language` メニューで言語を切り替えると、ナビ、HUD、時計、ポップアップ、MAPラベル、売地パネルの文言が切り替わる
+
+### Editions（`editions.html`）
+
+1. 読み込み中は `ENTER` が押せず `Loading the kingdom` と出る。完了すると `Press Enter` に変わる
+2. `ENTER` で雲の上から約 4 秒で島へ降下し、必ず Kingdom 章から始まる（スクロールしてリロードしても前回の章へ飛ばない）
+3. スクロールで章が順に切り替わり、本文パネルと左のインデックスが追従する
+4. 建物・看板のクリック、インデックス、`Own a plot` で、間の章を経由せず目的の章へ直行する
+5. 各章でカメラが対象の「正面」を向き、手前の別の建物や木で主役が隠れていない
+6. ドラッグで少し見回せ、離すと正面へ戻る
+7. `MAP` で俯瞰になり、建物ホバーで章名、クリックでその章へ降りる。`Esc` で元の章へ戻る
+8. CTA で新規タブが開き「Departing 〇〇」が出てから遷移先へ変わる。元のタブは世界の表示のまま
+9. Film 章に近づくまで動画（数十 MB）を取りに行かず、看板にはサムネが出る。章に入ると再生される
+10. 地面に細かな粒立ちがあり、草むらが風で揺れる
